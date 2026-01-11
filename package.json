@@ -2,16 +2,29 @@
   "name": "bklg",
   "version": "0.0.1",
   "description": "bklg is a simple wrapper around the backlog.jp API v2.",
-  "main": "index.js",
+  "main": "dist/index.js",
+  "bin": {
+    "bklg": "dist/cli/index.js"
+  },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "build": "tsc -p tsconfig.json"
+    "build": "tsc -p tsconfig.json",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "test": "echo \"No tests yet\" && exit 1"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "type": "commonjs",
+  "type": "module",
+  "dependencies": {
+    "commander": "^12.1.0"
+  },
   "devDependencies": {
+    "@types/node": "^22.13.4",
+    "typescript-eslint": "^8.21.0",
+    "eslint": "^9.19.0",
+    "eslint-config-prettier": "^10.0.1",
+    "prettier": "^3.4.2",
     "typescript": "^5.9.3"
   }
 }
