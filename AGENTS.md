@@ -73,12 +73,12 @@ Always start work from open GitHub issues and keep them updated.
 Commands:
 
 - List open issues:
-  - gh issue list -R hgwr/CaloryLog
+  - gh issue list -R hgwr/bklg
 - View an issue:
-  - gh issue view <id> -R hgwr/CaloryLog
+  - gh issue view <id> -R hgwr/bklg
 - Comment and close when done:
   - gh issue comment <id> -b "summary..."
-  - gh issue close <id> -R hgwr/CaloryLog
+  - gh issue close <id> -R hgwr/bklg
 
 ## GitHub CLI Text Formatting
 
@@ -90,7 +90,7 @@ Examples:
 - Issue/PR bodies via heredoc:
   - 
     ```
-    cat <<'EOF' | gh issue create -R hgwr/CaloryLog --title "..." --body-file -
+    cat <<'EOF' | gh issue create -R hgwr/bklg --title "..." --body-file -
     line 1
 
     line 2
@@ -98,15 +98,15 @@ Examples:
     ```
   - 
     ```
-    cat <<'EOF' | gh pr create -R hgwr/CaloryLog --title "..." --body-file -
+    cat <<'EOF' | gh pr create -R hgwr/bklg --title "..." --body-file -
     line 1
 
     line 2
     EOF
     ```
 - Short bodies with escaped newlines:
-  - gh issue comment <id> -R hgwr/CaloryLog -b $'line 1\n\nline 2'
-  - gh pr comment <id> -R hgwr/CaloryLog -b $'line 1\n\nline 2'
+  - gh issue comment <id> -R hgwr/bklg -b $'line 1\n\nline 2'
+  - gh pr comment <id> -R hgwr/bklg -b $'line 1\n\nline 2'
 
 ## Branching and Review
 
