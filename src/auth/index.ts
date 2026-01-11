@@ -1,5 +1,5 @@
 import { deleteConfig, hasConfigValues, loadConfig, saveConfig } from "./config.js";
-import { err, ok, type Result } from "../utils/index.js";
+import { err, isNonEmptyString, ok, type Result } from "../utils/index.js";
 
 export type AuthInput = {
   space?: string;
@@ -14,9 +14,6 @@ export type AuthStatus = {
 };
 
 export type LogoutStatus = "missing" | "cleared" | "deleted";
-
-const isNonEmptyString = (value: unknown): value is string =>
-  typeof value === "string" && value.trim().length > 0;
 
 const maskApiKey = (apiKey: string): string => {
   const trimmed = apiKey.trim();
@@ -83,8 +80,7 @@ export const logout = async (): Promise<Result<LogoutStatus>> => {
     return ok("missing");
   }
 
-  const { space, host } = configResult.value;
-  const config = { ...(space ? { space } : {}), ...(host ? { host } : {}) };
+  const { apiKey: _apiKey, ...config } = configResult.value;
 
   if (!hasConfigValues(config)) {
     const deleted = await deleteConfig();

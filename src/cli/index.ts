@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { Command, Option } from "commander";
-import { login, logout, status } from "../auth/index.js";
+import { login, logout, status, type AuthInput } from "../auth/index.js";
 
 const program = new Command();
 
@@ -15,16 +15,30 @@ program
 
 const auth = program.command("auth").description("Authentication commands");
 
+const toAuthInput = (opts: { space?: string; host?: string; apiKey?: string }): AuthInput => {
+  const input: AuthInput = {};
+
+  if (opts.space) {
+    input.space = opts.space;
+  }
+
+  if (opts.host) {
+    input.host = opts.host;
+  }
+
+  if (opts.apiKey) {
+    input.apiKey = opts.apiKey;
+  }
+
+  return input;
+};
+
 auth
   .command("login")
   .description("Save API key to local config")
   .action(async () => {
     const opts = program.opts<{ space?: string; host?: string; apiKey?: string }>();
-    const input = {
-      ...(opts.space ? { space: opts.space } : {}),
-      ...(opts.host ? { host: opts.host } : {}),
-      ...(opts.apiKey ? { apiKey: opts.apiKey } : {}),
-    };
+    const input = toAuthInput(opts);
     const result = await login(input);
     if (!result.ok) {
       console.error(result.error.message);
@@ -39,11 +53,7 @@ auth
   .description("Show current auth settings")
   .action(async () => {
     const opts = program.opts<{ space?: string; host?: string; apiKey?: string }>();
-    const input = {
-      ...(opts.space ? { space: opts.space } : {}),
-      ...(opts.host ? { host: opts.host } : {}),
-      ...(opts.apiKey ? { apiKey: opts.apiKey } : {}),
-    };
+    const input = toAuthInput(opts);
     const result = await status(input);
     if (!result.ok) {
       console.error(result.error.message);
