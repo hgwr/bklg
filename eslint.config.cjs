@@ -1,25 +1,10 @@
-const tseslint = require("@typescript-eslint/eslint-plugin");
-const tsParser = require("@typescript-eslint/parser");
+const tseslint = require("typescript-eslint");
 const prettier = require("eslint-config-prettier");
 
 module.exports = [
   {
     ignores: ["dist/**", "node_modules/**"],
   },
-  {
-    files: ["**/*.ts"],
-    languageOptions: {
-      parser: tsParser,
-      parserOptions: {
-        sourceType: "module",
-      },
-    },
-    plugins: {
-      "@typescript-eslint": tseslint,
-    },
-    rules: {
-      ...tseslint.configs.recommended.rules,
-    },
-  },
+  ...tseslint.configs.recommended,
   prettier,
 ];

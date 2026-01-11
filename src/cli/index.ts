@@ -10,6 +10,6 @@ program
   .option("--debug", "show debug logging", false)
   .option("--space <space>", "backlog space").env("BACKLOG_SPACE")
   .option("--host <host>", "backlog host", "backlog.jp").env("BACKLOG_HOST")
-  .option("--api-key <key>", "backlog api key");
+  .option("--api-key <key>", "backlog api key").env("BACKLOG_API_KEY");
 
 program.parse();
