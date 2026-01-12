@@ -202,7 +202,7 @@ export const formatComment = (comment: BacklogIssueComment, format: OutputFormat
 
   if (format === "text") {
     const lines = [`Comment ${comment.id} by ${author} at ${created}`];
-    if (updated) {
+    if (updated && updated !== created) {
       lines.push(`Updated: ${updated}`);
     }
     lines.push("", content);
@@ -215,7 +215,7 @@ export const formatComment = (comment: BacklogIssueComment, format: OutputFormat
     `- Author: ${author}`,
     `- Created: ${created}`,
   ];
-  if (updated) {
+  if (updated && updated !== created) {
     lines.push(`- Updated: ${updated}`);
   }
   lines.push("", content);
