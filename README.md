@@ -1,24 +1,24 @@
 # bklg
 
-Backlog（backlog.jp / backlog.com）の **API v2 を薄くラップするCLI** です。
-GitHub CLI の `gh` のように、ターミナルや VS Code から Backlog の課題（チケット）を扱いやすくすることを目的にしています。
+Backlog (backlog.jp / backlog.com) API v2 thin wrapper CLI.
+It aims to make issues and wiki pages easy to work with from terminals and editors.
 
-本プロジェクトは **APIキー認証** を採用します。
+- Japanese README: `README-ja.md`
 
-## 特徴
+## Features
 
-- 課題（issue）の閲覧・検索・コメント投稿をCLIで実行できる
-- 出力を `--format md|json|text` で切り替えできます（AI/エディタで扱いやすい）
-- Backlog API をなるべくそのまま反映した「薄いラッパー」を目指す
-- 設定はローカルに保存し、`BACKLOG_API_KEY` など環境変数でも上書きできる
+- View/search issues and post comments from the CLI
+- Switch output with `--format md|json|text`
+- Keep a thin mapping to Backlog API resources
+- Store auth locally, override with environment variables
 
-## インストール
+## Installation
 
-### npm（グローバル）
+### npm (global)
 
 ```bash
 npm i -g bklg
-````
+```
 
 ### npx
 
@@ -26,59 +26,59 @@ npm i -g bklg
 npx bklg --help
 ```
 
-## クイックスタート
+## Quick Start
 
-### 1) 接続先とAPIキーを設定
+### 1) Set space and API key
 
-Backlog の APIキーを用意してから（個人設定で発行）、以下を実行します。
+Generate an API key in Backlog personal settings, then run:
 
 ```bash
 bklg auth login --space your-space --api-key YOUR_API_KEY
 ```
 
-または環境変数で渡します（CIや一時利用向け）
+Or use environment variables (CI or short-lived usage):
 
 ```bash
 export BACKLOG_SPACE=your-space
 export BACKLOG_API_KEY=YOUR_API_KEY
 ```
 
-### 2) 課題を見る
+### 2) View an issue
 
 ```bash
 bklg issue view PROJ-123 --format md
 ```
 
-### 3) コメントを書く
+### 3) Post a comment
 
 ```bash
-bklg issue writeComment PROJ-123 -m "受け入れ条件を満たす修正を入れました。確認お願いします。"
+bklg issue writeComment PROJ-123 -m "Please review the fix."
 ```
 
-## 実用例
+## Practical Examples
 
-- 認証状態の確認
+- Check auth status
   ```bash
   bklg auth status --format md
   ```
-- 課題検索（projectId / statusId は数値）
+- Search issues (projectId/statusId are numeric)
   ```bash
-  bklg issue search --project 123 --status 1 --assignee me --keyword "ログイン" --format text
+  bklg issue search --project 123 --status 1 --assignee me --keyword "login" --format text
   ```
-- コメント一覧
+- List comments
   ```bash
   bklg issue comments PROJ-123 --format md
   ```
-- コメント投稿（ファイル）
+- Post a comment from a file
   ```bash
   bklg issue writeComment PROJ-123 --message-file ./comment.md --notify 1001,1002
   ```
-- Wiki 表示（project key/id を指定）
+- View a wiki page (project key or id)
   ```bash
   bklg wiki view "Wiki Page" --project PROJ --format md
   ```
 
-## 主なコマンド
+## Main Commands
 
 - `bklg auth login` / `bklg auth status` / `bklg auth logout`
 - `bklg issue view <issueKeyOrId>`
@@ -87,31 +87,31 @@ bklg issue writeComment PROJ-123 -m "受け入れ条件を満たす修正を入�
 - `bklg issue comments <issueKeyOrId>`
 - `bklg wiki view <pageName> --project <projectKeyOrId>`
 
-詳細は `docs/spec.md` を参照してください。
+See `docs/spec.md` for the full CLI spec.
 
-## 設定
+## Configuration
 
-優先順位（高い順）
+Priority order (highest first):
 
-1. コマンド引数
-2. 環境変数（例：`BACKLOG_SPACE`, `BACKLOG_API_KEY`）
-3. 設定ファイル（例：`~/.config/bklg/config.json`）
+1. CLI args
+2. Env vars (`BACKLOG_SPACE`, `BACKLOG_API_KEY`, `BACKLOG_HOST`)
+3. Config file (`~/.config/bklg/config.json`)
 
-設定ファイルは `bklg auth login` が作成します。
+`bklg auth login` creates the config file.
 
-## セキュリティ注意
+## Security Notes
 
-- APIキーはユーザー権限で Backlog へアクセスできる秘密情報なので共有しないでください。
-- CIでは環境変数による注入を推奨
+- API keys are sensitive. Do not share them.
+- Prefer env vars in CI.
 
-## 開発
+## Development
 
-### 必要要件
+### Requirements
 
-- Node.js（LTS推奨）
+- Node.js (LTS recommended)
 - npm
 
-### セットアップ
+### Setup
 
 ```bash
 npm ci
@@ -119,17 +119,17 @@ npm run build
 npm test
 ```
 
-### ローカル実行
+### Local run
 
 ```bash
 npm run build
 node dist/cli/index.js issue view PROJ-123 --format md
 ```
 
-## ライセンス
+## License
 
 MIT License
 
-## 免責
+## Disclaimer
 
-このツールは非公式です。Backlog の仕様変更により動作変更の可能性があります。
+Unofficial tool. Behavior may change if Backlog API changes.

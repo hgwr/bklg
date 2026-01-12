@@ -1,7 +1,15 @@
 {
   "name": "bklg",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "bklg is a simple wrapper around the backlog.jp API v2.",
+  "homepage": "https://github.com/hgwr/bklg#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hgwr/bklg.git"
+  },
+  "bugs": {
+    "url": "https://github.com/hgwr/bklg/issues"
+  },
   "main": "dist/index.js",
   "bin": {
     "bklg": "dist/cli/index.js"
