@@ -1,5 +1,6 @@
 import { deleteConfig, hasConfigValues, loadConfig, saveConfig } from "./config.js";
 import { err, isNonEmptyString, ok, type Result } from "../utils/index.js";
+import type { ApiAuth } from "../api/index.js";
 
 export type AuthInput = {
   space?: string;
@@ -11,12 +12,6 @@ export type AuthStatus = {
   space?: string;
   host?: string;
   apiKeyMasked?: string;
-};
-
-export type AuthCredentials = {
-  space: string;
-  host: string;
-  apiKey: string;
 };
 
 export type LogoutStatus = "missing" | "cleared" | "deleted";
@@ -76,7 +71,7 @@ export const status = async (input: AuthInput): Promise<Result<AuthStatus>> => {
   return ok(status);
 };
 
-export const resolveAuth = async (input: AuthInput): Promise<Result<AuthCredentials>> => {
+export const resolveAuth = async (input: AuthInput): Promise<Result<ApiAuth>> => {
   const configResult = await loadConfig();
   if (!configResult.ok) {
     return err(configResult.error);

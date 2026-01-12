@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 import { Command, InvalidArgumentError, Option } from "commander";
-import { getIssue, getMyself, searchIssues, type IssueSearchParams } from "../api/index.js";
+import { getIssue, getMyself, searchIssues, type ApiAuth, type IssueSearchParams } from "../api/index.js";
 import { login, logout, resolveAuth, status, type AuthInput } from "../auth/index.js";
 import { formatError, formatIssue, formatIssueList, type OutputFormat } from "../format/index.js";
+import { err, ok, type Result } from "../utils/index.js";
 
 const program = new Command();
 
@@ -72,6 +73,75 @@ const writeError = (error: Error, format: OutputFormat): void => {
     console.error(message);
   }
   process.exitCode = 1;
+};
+
+type SearchOptions = {
+  project: string[];
+  status?: string;
+  assignee?: string;
+  keyword?: string;
+  count?: number;
+  offset?: number;
+  sort?: string;
+  order?: string;
+};
+
+const buildIssueSearchParams = async (
+  searchOpts: SearchOptions,
+  auth: ApiAuth,
+  debug: boolean,
+): Promise<Result<IssueSearchParams>> => {
+  const params: IssueSearchParams = {};
+
+  if (searchOpts.project.length > 0) {
+    params.projectId = searchOpts.project;
+  }
+
+  if (searchOpts.status) {
+    const statusId = parseNumericId(searchOpts.status);
+    if (statusId === null) {
+      return err(new Error("Invalid --status. Provide a numeric statusId."));
+    }
+    params.statusId = [statusId];
+  }
+
+  if (searchOpts.assignee) {
+    if (searchOpts.assignee === "me") {
+      const meResult = await getMyself(auth, { debug });
+      if (!meResult.ok) {
+        return err(meResult.error);
+      }
+      params.assigneeId = [meResult.value.id];
+    } else {
+      const assigneeId = parseNumericId(searchOpts.assignee);
+      if (assigneeId === null) {
+        return err(new Error("Invalid --assignee. Provide a numeric userId or 'me'."));
+      }
+      params.assigneeId = [assigneeId];
+    }
+  }
+
+  if (searchOpts.keyword) {
+    params.keyword = searchOpts.keyword;
+  }
+
+  if (searchOpts.count !== undefined) {
+    params.count = searchOpts.count;
+  }
+
+  if (searchOpts.offset !== undefined) {
+    params.offset = searchOpts.offset;
+  }
+
+  if (searchOpts.sort) {
+    params.sort = searchOpts.sort;
+  }
+
+  if (searchOpts.order) {
+    params.order = searchOpts.order;
+  }
+
+  return ok(params);
 };
 
 auth
@@ -174,16 +244,7 @@ issue
   .option("--offset <n>", "offset", parseNumberOption)
   .option("--sort <created|updated|dueDate>", "sort field")
   .option("--order <asc|desc>", "sort order")
-  .action(async (searchOpts: {
-    project: string[];
-    status?: string;
-    assignee?: string;
-    keyword?: string;
-    count?: number;
-    offset?: number;
-    sort?: string;
-    order?: string;
-  }) => {
+  .action(async (searchOpts: SearchOptions) => {
     const opts = program.opts<{ format?: string; debug?: boolean; space?: string; host?: string; apiKey?: string }>();
     const format = resolveFormat(opts.format);
     if (!format) {
@@ -198,60 +259,13 @@ issue
       return;
     }
 
-    const params: IssueSearchParams = {};
-
-    if (searchOpts.project.length > 0) {
-      params.projectId = searchOpts.project;
+    const paramsResult = await buildIssueSearchParams(searchOpts, authResult.value, opts.debug ?? false);
+    if (!paramsResult.ok) {
+      writeError(paramsResult.error, format);
+      return;
     }
 
-    if (searchOpts.status) {
-      const statusId = parseNumericId(searchOpts.status);
-      if (statusId === null) {
-        writeError(new Error("Invalid --status. Provide a numeric statusId."), format);
-        return;
-      }
-      params.statusId = [statusId];
-    }
-
-    if (searchOpts.assignee) {
-      if (searchOpts.assignee === "me") {
-        const meResult = await getMyself(authResult.value, { debug: opts.debug ?? false });
-        if (!meResult.ok) {
-          writeError(meResult.error, format);
-          return;
-        }
-        params.assigneeId = [meResult.value.id];
-      } else {
-        const assigneeId = parseNumericId(searchOpts.assignee);
-        if (assigneeId === null) {
-          writeError(new Error("Invalid --assignee. Provide a numeric userId or 'me'."), format);
-          return;
-        }
-        params.assigneeId = [assigneeId];
-      }
-    }
-
-    if (searchOpts.keyword) {
-      params.keyword = searchOpts.keyword;
-    }
-
-    if (searchOpts.count !== undefined) {
-      params.count = searchOpts.count;
-    }
-
-    if (searchOpts.offset !== undefined) {
-      params.offset = searchOpts.offset;
-    }
-
-    if (searchOpts.sort) {
-      params.sort = searchOpts.sort;
-    }
-
-    if (searchOpts.order) {
-      params.order = searchOpts.order;
-    }
-
-    const result = await searchIssues(authResult.value, params, { debug: opts.debug ?? false });
+    const result = await searchIssues(authResult.value, paramsResult.value, { debug: opts.debug ?? false });
     if (!result.ok) {
       writeError(result.error, format);
       return;

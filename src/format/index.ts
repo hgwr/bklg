@@ -76,7 +76,7 @@ const formatFriendlyError = (payload: ErrorPayload): string => {
 export const formatError = (error: Error, format: OutputFormat): string => {
   const payload = toErrorPayload(error);
   if (format === "json") {
-    return `${JSON.stringify({ error: payload }, null, 2)}`;
+    return JSON.stringify({ error: payload }, null, 2);
   }
   return formatFriendlyError(payload);
 };
@@ -87,7 +87,7 @@ export const formatIssue = (
   context: FormatContext = {},
 ): string => {
   if (format === "json") {
-    return `${JSON.stringify(issue, null, 2)}`;
+    return JSON.stringify(issue, null, 2);
   }
 
   const status = issue.status?.name ?? "(unknown)";
@@ -125,7 +125,7 @@ export const formatIssueList = (
   context: FormatContext = {},
 ): string => {
   if (format === "json") {
-    return `${JSON.stringify(issues, null, 2)}`;
+    return JSON.stringify(issues, null, 2);
   }
 
   if (issues.length === 0) {
