@@ -154,9 +154,7 @@ export const formatAuthStatus = (value: AuthStatus, format: OutputFormat): strin
   if (value.space) {
     lines.push(`Space: ${value.space}`);
   }
-  if (value.host) {
-    lines.push(`Host: ${value.host}`);
-  }
+  lines.push(`Host: ${host}`);
   lines.push(`API Key: ${apiKey}`);
   return lines.join("\n");
 };

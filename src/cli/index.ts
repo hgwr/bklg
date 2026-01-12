@@ -108,6 +108,16 @@ const resolveOutputFormat = (): OutputFormat | null => {
   return format;
 };
 
+const withOutputFormat = (action: (format: OutputFormat) => Promise<void>) => {
+  return async () => {
+    const format = resolveOutputFormat();
+    if (!format) {
+      return;
+    }
+    await action(format);
+  };
+};
+
 type CommandContext = {
   format: OutputFormat;
   debug: boolean;
@@ -281,11 +291,8 @@ const parseNotifyIds = (value: string | undefined): Result<number[]> => {
 auth
   .command("login")
   .description("Save API key to local config")
-  .action(async () => {
-    const format = resolveOutputFormat();
-    if (!format) {
-      return;
-    }
+  .action(
+    withOutputFormat(async (format) => {
     const opts = program.opts<{ space?: string; host?: string; apiKey?: string }>();
     const input = toAuthInput(opts);
     const result = await login(input);
@@ -294,16 +301,14 @@ auth
       return;
     }
     console.log(formatAuthLogin(result.value, format));
-  });
+    }),
+  );
 
 auth
   .command("status")
   .description("Show current auth settings")
-  .action(async () => {
-    const format = resolveOutputFormat();
-    if (!format) {
-      return;
-    }
+  .action(
+    withOutputFormat(async (format) => {
     const opts = program.opts<{ space?: string; host?: string; apiKey?: string }>();
     const input = toAuthInput(opts);
     const result = await status(input);
@@ -313,23 +318,22 @@ auth
     }
 
     console.log(formatAuthStatus(result.value, format));
-  });
+    }),
+  );
 
 auth
   .command("logout")
   .description("Remove stored API key")
-  .action(async () => {
-    const format = resolveOutputFormat();
-    if (!format) {
-      return;
-    }
+  .action(
+    withOutputFormat(async (format) => {
     const result = await logout();
     if (!result.ok) {
       writeError(result.error, format);
       return;
     }
     console.log(formatAuthLogout(result.value, format));
-  });
+    }),
+  );
 
 issue
   .command("view")
