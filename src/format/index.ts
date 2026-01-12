@@ -4,6 +4,7 @@ import {
   type BacklogIssue,
   type BacklogIssueComment,
   type BacklogUser,
+  type BacklogWikiDetail,
 } from "../api/index.js";
 import type { AuthStatus, LogoutStatus } from "../auth/index.js";
 
@@ -99,7 +100,7 @@ const formatFriendlyError = (payload: ErrorPayload): string => {
     return "Authentication failed. Check --api-key/--space or BACKLOG_API_KEY/BACKLOG_SPACE.";
   }
   if (payload.status === 404) {
-    return "Not found. Check the issue key/id or your permissions.";
+    return "Not found. Check the resource name or your permissions.";
   }
   if (payload.status === 429) {
     return "Rate limit exceeded. Please retry later.";
@@ -314,4 +315,41 @@ export const formatCommentDraft = (draft: CommentDraft, format: OutputFormat): s
   return ["# Dry Run", "", `- Issue: ${draft.issueIdOrKey}`, `- Notify: ${notify}`, "", "## Content", content].join(
     "\n",
   );
+};
+
+export const formatWiki = (wiki: BacklogWikiDetail, format: OutputFormat): string => {
+  if (format === "json") {
+    return JSON.stringify(wiki, null, 2);
+  }
+
+  const created = wiki.created ?? "(unknown)";
+  const updated = wiki.updated ?? "(unknown)";
+  const createdBy = formatUser(wiki.createdUser, "(unknown)");
+  const updatedBy = formatUser(wiki.updatedUser, "(unknown)");
+  const tags = wiki.tags && wiki.tags.length > 0 ? wiki.tags.map((tag) => tag.name).join(", ") : "(none)";
+  const content = formatCommentContent(wiki.content);
+
+  if (format === "text") {
+    return [
+      `Wiki: ${wiki.name}`,
+      `Created: ${created} by ${createdBy}`,
+      `Updated: ${updated} by ${updatedBy}`,
+      `Tags: ${tags}`,
+      "",
+      content,
+    ].join("\n");
+  }
+
+  return [
+    `# ${wiki.name}`,
+    "",
+    `- Created: ${created}`,
+    `- Created By: ${createdBy}`,
+    `- Updated: ${updated}`,
+    `- Updated By: ${updatedBy}`,
+    `- Tags: ${tags}`,
+    "",
+    "## Content",
+    content,
+  ].join("\n");
 };

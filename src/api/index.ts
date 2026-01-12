@@ -61,6 +61,34 @@ export type BacklogIssueComment = {
   updatedUser?: BacklogUser;
 };
 
+export type BacklogWikiTag = {
+  id: number;
+  name: string;
+};
+
+export type BacklogWikiSummary = {
+  id: number;
+  name: string;
+  projectId?: number;
+  tags?: BacklogWikiTag[];
+  created?: string;
+  updated?: string;
+  createdUser?: BacklogUser;
+  updatedUser?: BacklogUser;
+};
+
+export type BacklogWikiDetail = {
+  id: number;
+  name: string;
+  projectId?: number;
+  content?: string | null;
+  tags?: BacklogWikiTag[];
+  created?: string;
+  updated?: string;
+  createdUser?: BacklogUser;
+  updatedUser?: BacklogUser;
+};
+
 export type IssueSearchParams = {
   projectId?: string[];
   statusId?: number[];
@@ -278,6 +306,27 @@ export const postIssueComment = async (
     path: `issues/${encodeURIComponent(issueIdOrKey)}/comments`,
     method: "POST",
     body,
+    debug: options.debug ?? false,
+  });
+};
+
+export const getWikis = async (
+  auth: ApiAuth,
+  options: { debug?: boolean } = {},
+): Promise<Result<BacklogWikiSummary[]>> => {
+  return requestJson<BacklogWikiSummary[]>(auth, {
+    path: "wikis",
+    debug: options.debug ?? false,
+  });
+};
+
+export const getWiki = async (
+  auth: ApiAuth,
+  wikiId: number,
+  options: { debug?: boolean } = {},
+): Promise<Result<BacklogWikiDetail>> => {
+  return requestJson<BacklogWikiDetail>(auth, {
+    path: `wikis/${wikiId}`,
     debug: options.debug ?? false,
   });
 };
