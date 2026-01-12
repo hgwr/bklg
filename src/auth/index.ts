@@ -13,6 +13,12 @@ export type AuthStatus = {
   apiKeyMasked?: string;
 };
 
+export type AuthCredentials = {
+  space: string;
+  host: string;
+  apiKey: string;
+};
+
 export type LogoutStatus = "missing" | "cleared" | "deleted";
 
 const maskApiKey = (apiKey: string): string => {
@@ -68,6 +74,24 @@ export const status = async (input: AuthInput): Promise<Result<AuthStatus>> => {
   }
 
   return ok(status);
+};
+
+export const resolveAuth = async (input: AuthInput): Promise<Result<AuthCredentials>> => {
+  const configResult = await loadConfig();
+  if (!configResult.ok) {
+    return err(configResult.error);
+  }
+
+  const config = configResult.value ?? {};
+  const space = isNonEmptyString(input.space) ? input.space.trim() : config.space;
+  const host = resolveHost(isNonEmptyString(input.host) ? input.host.trim() : config.host);
+  const apiKey = isNonEmptyString(input.apiKey) ? input.apiKey.trim() : config.apiKey;
+
+  if (!space || !apiKey) {
+    return err(new Error("Missing required --space or --api-key (or BACKLOG_SPACE/BACKLOG_API_KEY)."));
+  }
+
+  return ok({ space, host, apiKey });
 };
 
 export const logout = async (): Promise<Result<LogoutStatus>> => {
