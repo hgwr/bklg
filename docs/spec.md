@@ -192,6 +192,10 @@ Output
 
 - API: `GET /api/v2/wikis` + `GET /api/v2/wikis/:wikiId` など
 
+Usage
+
+- `bklg wiki view "Wiki Page" --project PROJ`
+
 Output
 
 - `text`: `Wiki: <name>` + 本文

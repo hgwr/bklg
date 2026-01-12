@@ -312,10 +312,14 @@ export const postIssueComment = async (
 
 export const getWikis = async (
   auth: ApiAuth,
+  params: { projectIdOrKey?: string },
   options: { debug?: boolean } = {},
 ): Promise<Result<BacklogWikiSummary[]>> => {
   return requestJson<BacklogWikiSummary[]>(auth, {
     path: "wikis",
+    query: {
+      projectIdOrKey: params.projectIdOrKey,
+    },
     debug: options.debug ?? false,
   });
 };

@@ -472,13 +472,14 @@ wiki
   .command("view")
   .description("View a wiki page by name")
   .argument("<pageName>", "Wiki page name")
-  .action(async (pageName: string) => {
+  .requiredOption("--project <projectKey>", "Project key for the wiki")
+  .action(async (pageName: string, opts: { project: string }) => {
     const context = await resolveCommandContext();
     if (!context) {
       return;
     }
 
-    const listResult = await getWikis(context.auth, { debug: context.debug });
+    const listResult = await getWikis(context.auth, { projectIdOrKey: opts.project }, { debug: context.debug });
     if (!listResult.ok) {
       writeError(listResult.error, context.format);
       return;
@@ -490,8 +491,8 @@ wiki
         new ApiError({
           status: 404,
           statusText: "Not Found",
-          url: `wiki:${pageName}`,
-          body: { pageName },
+          url: `wiki:${pageName} in project ${opts.project}`,
+          body: { pageName, project: opts.project },
         }),
         context.format,
       );
