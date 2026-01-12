@@ -1,5 +1,6 @@
 import { deleteConfig, hasConfigValues, loadConfig, saveConfig } from "./config.js";
 import { err, isNonEmptyString, ok, type Result } from "../utils/index.js";
+import type { ApiAuth } from "../api/index.js";
 
 export type AuthInput = {
   space?: string;
@@ -68,6 +69,24 @@ export const status = async (input: AuthInput): Promise<Result<AuthStatus>> => {
   }
 
   return ok(status);
+};
+
+export const resolveAuth = async (input: AuthInput): Promise<Result<ApiAuth>> => {
+  const configResult = await loadConfig();
+  if (!configResult.ok) {
+    return err(configResult.error);
+  }
+
+  const config = configResult.value ?? {};
+  const space = isNonEmptyString(input.space) ? input.space.trim() : config.space;
+  const host = resolveHost(isNonEmptyString(input.host) ? input.host.trim() : config.host);
+  const apiKey = isNonEmptyString(input.apiKey) ? input.apiKey.trim() : config.apiKey;
+
+  if (!space || !apiKey) {
+    return err(new Error("Missing required --space or --api-key (or BACKLOG_SPACE/BACKLOG_API_KEY)."));
+  }
+
+  return ok({ space, host, apiKey });
 };
 
 export const logout = async (): Promise<Result<LogoutStatus>> => {
