@@ -52,16 +52,40 @@ bklg issue view PROJ-123 --format md
 ### 3) コメントを書く
 
 ```bash
-bklg issue comment PROJ-123 -m "受け入れ条件を満たす修正を入れました。確認お願いします。"
+bklg issue writeComment PROJ-123 -m "受け入れ条件を満たす修正を入れました。確認お願いします。"
 ```
 
-## 主なコマンド（予定）
+## 実用例
+
+- 認証状態の確認
+  ```bash
+  bklg auth status --format md
+  ```
+- 課題検索（projectId / statusId は数値）
+  ```bash
+  bklg issue search --project 123 --status 1 --assignee me --keyword "ログイン" --format text
+  ```
+- コメント一覧
+  ```bash
+  bklg issue comments PROJ-123 --format md
+  ```
+- コメント投稿（ファイル）
+  ```bash
+  bklg issue writeComment PROJ-123 --message-file ./comment.md --notify 1001,1002
+  ```
+- Wiki 表示（project key/id を指定）
+  ```bash
+  bklg wiki view "Wiki Page" --project PROJ --format md
+  ```
+
+## 主なコマンド
 
 - `bklg auth login` / `bklg auth status` / `bklg auth logout`
 - `bklg issue view <issueKeyOrId>`
-- `bklg issue search [--project PROJ] [--assignee me] [--status open] [--keyword "..."]`
-- `bklg issue comment <issueKeyOrId> -m "..." [--notify userId,...]`
-- `bklg wiki view <pageName>`（将来）
+- `bklg issue search [--project <projectId>] [--assignee me] [--status <statusId>] [--keyword "..."]`
+- `bklg issue writeComment <issueKeyOrId> -m "..." [--notify userId,...] [--dry-run]`
+- `bklg issue comments <issueKeyOrId>`
+- `bklg wiki view <pageName> --project <projectKeyOrId>`
 
 詳細は `docs/spec.md` を参照してください。
 
@@ -98,7 +122,8 @@ npm test
 ### ローカル実行
 
 ```bash
-npm run dev -- issue view PROJ-123 --format md
+npm run build
+node dist/cli/index.js issue view PROJ-123 --format md
 ```
 
 ## ライセンス
