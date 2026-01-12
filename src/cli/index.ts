@@ -1,9 +1,28 @@
 #!/usr/bin/env node
+import fs from "node:fs/promises";
+
 import { Command, InvalidArgumentError, Option } from "commander";
-import { getIssue, getMyself, searchIssues, type ApiAuth, type IssueSearchParams } from "../api/index.js";
+import {
+  getIssue,
+  getIssueComments,
+  getMyself,
+  postIssueComment,
+  searchIssues,
+  type ApiAuth,
+  type IssueCommentInput,
+  type IssueSearchParams,
+} from "../api/index.js";
 import { login, logout, resolveAuth, status, type AuthInput } from "../auth/index.js";
-import { formatError, formatIssue, formatIssueList, type OutputFormat } from "../format/index.js";
-import { err, ok, type Result } from "../utils/index.js";
+import {
+  formatComment,
+  formatCommentDraft,
+  formatCommentList,
+  formatError,
+  formatIssue,
+  formatIssueList,
+  type OutputFormat,
+} from "../format/index.js";
+import { err, isNonEmptyString, ok, toError, type Result } from "../utils/index.js";
 
 const program = new Command();
 
@@ -75,6 +94,13 @@ const writeError = (error: Error, format: OutputFormat): void => {
   process.exitCode = 1;
 };
 
+type CommandContext = {
+  format: OutputFormat;
+  debug: boolean;
+  auth: ApiAuth;
+  baseUrl: string;
+};
+
 type SearchOptions = {
   project: string[];
   status?: string;
@@ -84,6 +110,36 @@ type SearchOptions = {
   offset?: number;
   sort?: string;
   order?: string;
+};
+
+type WriteCommentOptions = {
+  message?: string;
+  messageFile?: string;
+  notify?: string;
+  dryRun?: boolean;
+};
+
+const resolveCommandContext = async (): Promise<CommandContext | null> => {
+  const opts = program.opts<{ format?: string; debug?: boolean; space?: string; host?: string; apiKey?: string }>();
+  const format = resolveFormat(opts.format);
+  if (!format) {
+    console.error(`Unsupported format: ${opts.format ?? ""}`);
+    process.exitCode = 1;
+    return null;
+  }
+
+  const authResult = await resolveAuth(toAuthInput(opts));
+  if (!authResult.ok) {
+    writeError(authResult.error, format);
+    return null;
+  }
+
+  return {
+    format,
+    debug: opts.debug ?? false,
+    auth: authResult.value,
+    baseUrl: `https://${authResult.value.space}.${authResult.value.host}`,
+  };
 };
 
 const buildIssueSearchParams = async (
@@ -142,6 +198,72 @@ const buildIssueSearchParams = async (
   }
 
   return ok(params);
+};
+
+const readMessageFile = async (filePath: string): Promise<Result<string>> => {
+  try {
+    const content = await fs.readFile(filePath, "utf8");
+    return ok(content);
+  } catch (error) {
+    return err(toError(error));
+  }
+};
+
+const normalizeMessage = (value: string): string | null => {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return null;
+  }
+  return trimmed;
+};
+
+const resolveMessageContent = async (
+  message: string | undefined,
+  messageFile: string | undefined,
+): Promise<Result<string>> => {
+  if (isNonEmptyString(message)) {
+    const normalized = normalizeMessage(message);
+    if (!normalized) {
+      return err(new Error("Message is empty."));
+    }
+    return ok(normalized);
+  }
+
+  if (isNonEmptyString(messageFile)) {
+    const fileResult = await readMessageFile(messageFile.trim());
+    if (!fileResult.ok) {
+      return err(fileResult.error);
+    }
+    const normalized = normalizeMessage(fileResult.value);
+    if (!normalized) {
+      return err(new Error("Message file is empty."));
+    }
+    return ok(normalized);
+  }
+
+  return err(new Error("Missing required --message or --message-file."));
+};
+
+const parseNotifyIds = (value: string | undefined): Result<number[]> => {
+  if (!isNonEmptyString(value)) {
+    return ok([]);
+  }
+
+  const parts = value
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length > 0);
+
+  const ids: number[] = [];
+  for (const entry of parts) {
+    const parsed = parseNumericId(entry);
+    if (parsed === null) {
+      return err(new Error(`Invalid --notify value: "${entry}". Use numeric user IDs.`));
+    }
+    ids.push(parsed);
+  }
+
+  return ok(ids);
 };
 
 auth
@@ -209,28 +331,95 @@ issue
   .description("View an issue by key or id")
   .argument("<issueKeyOrId>", "Issue key (PROJ-123) or numeric id")
   .action(async (issueKeyOrId: string) => {
-    const opts = program.opts<{ format?: string; debug?: boolean; space?: string; host?: string; apiKey?: string }>();
-    const format = resolveFormat(opts.format);
-    if (!format) {
-      console.error(`Unsupported format: ${opts.format ?? ""}`);
-      process.exitCode = 1;
+    const context = await resolveCommandContext();
+    if (!context) {
       return;
     }
 
-    const authResult = await resolveAuth(toAuthInput(opts));
-    if (!authResult.ok) {
-      writeError(authResult.error, format);
-      return;
-    }
-
-    const result = await getIssue(authResult.value, issueKeyOrId, { debug: opts.debug ?? false });
+    const result = await getIssue(context.auth, issueKeyOrId, { debug: context.debug });
     if (!result.ok) {
-      writeError(result.error, format);
+      writeError(result.error, context.format);
       return;
     }
 
-    const baseUrl = `https://${authResult.value.space}.${authResult.value.host}`;
-    console.log(formatIssue(result.value, format, { baseUrl }));
+    console.log(formatIssue(result.value, context.format, { baseUrl: context.baseUrl }));
+  });
+
+issue
+  .command("comments")
+  .description("List issue comments")
+  .argument("<issueKeyOrId>", "Issue key (PROJ-123) or numeric id")
+  .action(async (issueKeyOrId: string) => {
+    const context = await resolveCommandContext();
+    if (!context) {
+      return;
+    }
+
+    const result = await getIssueComments(context.auth, issueKeyOrId, { debug: context.debug });
+    if (!result.ok) {
+      writeError(result.error, context.format);
+      return;
+    }
+
+    console.log(formatCommentList(result.value, context.format));
+  });
+
+issue
+  .command("writeComment")
+  .description("Write a comment to an issue")
+  .argument("<issueKeyOrId>", "Issue key (PROJ-123) or numeric id")
+  .addOption(new Option("-m, --message <text>", "comment content").conflicts("messageFile"))
+  .addOption(new Option("--message-file <path>", "comment content file").conflicts("message"))
+  .option("--notify <userIdCSV>", "notify user IDs (comma-separated)")
+  .option("--dry-run", "show comment without posting", false)
+  .action(async (issueKeyOrId: string, writeOpts: WriteCommentOptions) => {
+    const context = await resolveCommandContext();
+    if (!context) {
+      return;
+    }
+
+    const contentResult = await resolveMessageContent(writeOpts.message, writeOpts.messageFile);
+    if (!contentResult.ok) {
+      writeError(contentResult.error, context.format);
+      return;
+    }
+
+    const notifyResult = parseNotifyIds(writeOpts.notify);
+    if (!notifyResult.ok) {
+      writeError(notifyResult.error, context.format);
+      return;
+    }
+
+    const draft = {
+      issueIdOrKey: issueKeyOrId,
+      content: contentResult.value,
+      notifiedUserIds: notifyResult.value,
+    };
+
+    if (writeOpts.dryRun) {
+      console.log(formatCommentDraft(draft, context.format));
+      return;
+    }
+
+    const input: IssueCommentInput = {
+      content: contentResult.value,
+    };
+    if (notifyResult.value.length > 0) {
+      input.notifiedUserIds = notifyResult.value;
+    }
+
+    const result = await postIssueComment(context.auth, issueKeyOrId, input, { debug: context.debug });
+    if (!result.ok) {
+      writeError(result.error, context.format);
+      return;
+    }
+
+    if (context.format === "text") {
+      console.log(`Comment posted: ${result.value.id}`);
+      return;
+    }
+
+    console.log(formatComment(result.value, context.format));
   });
 
 issue
@@ -245,34 +434,24 @@ issue
   .option("--sort <created|updated|dueDate>", "sort field")
   .option("--order <asc|desc>", "sort order")
   .action(async (searchOpts: SearchOptions) => {
-    const opts = program.opts<{ format?: string; debug?: boolean; space?: string; host?: string; apiKey?: string }>();
-    const format = resolveFormat(opts.format);
-    if (!format) {
-      console.error(`Unsupported format: ${opts.format ?? ""}`);
-      process.exitCode = 1;
+    const context = await resolveCommandContext();
+    if (!context) {
       return;
     }
 
-    const authResult = await resolveAuth(toAuthInput(opts));
-    if (!authResult.ok) {
-      writeError(authResult.error, format);
-      return;
-    }
-
-    const paramsResult = await buildIssueSearchParams(searchOpts, authResult.value, opts.debug ?? false);
+    const paramsResult = await buildIssueSearchParams(searchOpts, context.auth, context.debug);
     if (!paramsResult.ok) {
-      writeError(paramsResult.error, format);
+      writeError(paramsResult.error, context.format);
       return;
     }
 
-    const result = await searchIssues(authResult.value, paramsResult.value, { debug: opts.debug ?? false });
+    const result = await searchIssues(context.auth, paramsResult.value, { debug: context.debug });
     if (!result.ok) {
-      writeError(result.error, format);
+      writeError(result.error, context.format);
       return;
     }
 
-    const baseUrl = `https://${authResult.value.space}.${authResult.value.host}`;
-    console.log(formatIssueList(result.value, format, { baseUrl }));
+    console.log(formatIssueList(result.value, context.format, { baseUrl: context.baseUrl }));
   });
 
 void program.parseAsync();
