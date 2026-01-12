@@ -69,16 +69,29 @@ Behavior
 
 Output
 
-- 成功時：`Logged in as <space>.<host>`
-- 失敗時：理由（ファイル権限、入力不足など）
+- `text`: `Logged in as <space>.<host>`
+- `md`: 見出し + Space/Host を表示
+- `json`: `{ "space": "...", "host": "..." }`
 
 #### 2.2.2 `bklg auth status`
 
 設定されている接続先を表示します（キーはマスク）。
 
+Output
+
+- `text`: `Space/Host/API Key` を表示（未設定なら `Not logged in.`）
+- `md`: 見出し + Space/Host/API Key を表示
+- `json`: `{ "space": "...", "host": "...", "apiKeyMasked": "..." }`
+
 #### 2.2.3 `bklg auth logout`
 
 設定ファイルから apiKey を削除またはファイル削除（実装で決定）。
+
+Output
+
+- `text`: `Logged out.` / `Already logged out.`
+- `md`: 見出し + メッセージ
+- `json`: `{ "status": "cleared|deleted|missing" }`
 
 ### 2.3 issue
 
@@ -125,14 +138,14 @@ Markdown 出力案（例）
 
 Usage（例）
 
-- `bklg issue search --project PROJ --status open --assignee me --keyword "ログイン"`
-- `bklg issue search --count 20 --order updated`
+- `bklg issue search --project 123 --status 1 --assignee me --keyword "ログイン"`
+- `bklg issue search --count 20 --order desc`
 
 *主要オプション（案）**
 
-- `--project <PROJECT_KEY>`（複数指定可にするなら `--project PROJ --project ABC`）
-- `--status <open|closed|...>`（Backlog の statusId を内部で解決するか、まずは数値指定）
-- `--assignee <me|userId>`
+- `--project <projectId>`（複数指定可: `--project 1 --project 2`）
+- `--status <statusId>`（数値）
+- `--assignee <me|userId>`（userId は数値）
 - `--keyword <text>`
 - `--count <n>`（既定：20、最大はAPIに合わせる）
 - `--offset <n>`
@@ -160,8 +173,8 @@ Usage
 
 Options
 
-- `-m, --message <text>`
-- `--message-file <path>`
+- `-m, --message <text>`（`--message-file` と排他）
+- `--message-file <path>`（`--message` と排他）
 - `--notify <userIdCSV>`（Backlog API の `notifiedUserId[]` に対応）
 - `--dry-run`（送信せず表示のみ）
 
@@ -169,6 +182,7 @@ Output
 
 - `text`: `Comment posted: <commentId>`
 - `json`: 作成されたコメントのレスポンス
+- `md`: 作成されたコメントを見出し＋本文で表示
 
 #### 2.3.4 コメント一覧取得 `bklg issue comments <issueKeyOrId>`
 
@@ -194,7 +208,7 @@ Output
 
 Usage
 
-- `bklg wiki view "Wiki Page" --project PROJ`
+- `bklg wiki view "Wiki Page" --project PROJ`（project key or id）
 
 Output
 
@@ -213,10 +227,13 @@ Output
 
 ```json
 {
-  "error": true,
-  "status": 404,
-  "message": "Issue not found",
-  "details": { "...": "..." }
+  "error": {
+    "message": "Request failed (404 Not Found)",
+    "status": 404,
+    "statusText": "Not Found",
+    "details": { "...": "..." },
+    "url": "..."
+  }
 }
 ```
 
