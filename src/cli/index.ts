@@ -17,6 +17,9 @@ import {
   formatComment,
   formatCommentDraft,
   formatCommentList,
+  formatAuthLogin,
+  formatAuthLogout,
+  formatAuthStatus,
   formatError,
   formatIssue,
   formatIssueList,
@@ -94,6 +97,17 @@ const writeError = (error: Error, format: OutputFormat): void => {
   process.exitCode = 1;
 };
 
+const resolveOutputFormat = (): OutputFormat | null => {
+  const opts = program.opts<{ format?: string }>();
+  const format = resolveFormat(opts.format);
+  if (!format) {
+    console.error(`Unsupported format: ${opts.format ?? ""}`);
+    process.exitCode = 1;
+    return null;
+  }
+  return format;
+};
+
 type CommandContext = {
   format: OutputFormat;
   debug: boolean;
@@ -121,10 +135,8 @@ type WriteCommentOptions = {
 
 const resolveCommandContext = async (): Promise<CommandContext | null> => {
   const opts = program.opts<{ format?: string; debug?: boolean; space?: string; host?: string; apiKey?: string }>();
-  const format = resolveFormat(opts.format);
+  const format = resolveOutputFormat();
   if (!format) {
-    console.error(`Unsupported format: ${opts.format ?? ""}`);
-    process.exitCode = 1;
     return null;
   }
 
@@ -270,60 +282,53 @@ auth
   .command("login")
   .description("Save API key to local config")
   .action(async () => {
+    const format = resolveOutputFormat();
+    if (!format) {
+      return;
+    }
     const opts = program.opts<{ space?: string; host?: string; apiKey?: string }>();
     const input = toAuthInput(opts);
     const result = await login(input);
     if (!result.ok) {
-      console.error(result.error.message);
-      process.exitCode = 1;
+      writeError(result.error, format);
       return;
     }
-    console.log(`Logged in as ${result.value.space}.${result.value.host}`);
+    console.log(formatAuthLogin(result.value, format));
   });
 
 auth
   .command("status")
   .description("Show current auth settings")
   .action(async () => {
+    const format = resolveOutputFormat();
+    if (!format) {
+      return;
+    }
     const opts = program.opts<{ space?: string; host?: string; apiKey?: string }>();
     const input = toAuthInput(opts);
     const result = await status(input);
     if (!result.ok) {
-      console.error(result.error.message);
-      process.exitCode = 1;
+      writeError(result.error, format);
       return;
     }
 
-    const { space, host, apiKeyMasked } = result.value;
-    if (!space && !apiKeyMasked) {
-      console.log("Not logged in.");
-      return;
-    }
-
-    if (space) {
-      console.log(`Space: ${space}`);
-    }
-    if (host) {
-      console.log(`Host: ${host}`);
-    }
-    console.log(`API Key: ${apiKeyMasked ?? "(not set)"}`);
+    console.log(formatAuthStatus(result.value, format));
   });
 
 auth
   .command("logout")
   .description("Remove stored API key")
   .action(async () => {
+    const format = resolveOutputFormat();
+    if (!format) {
+      return;
+    }
     const result = await logout();
     if (!result.ok) {
-      console.error(result.error.message);
-      process.exitCode = 1;
+      writeError(result.error, format);
       return;
     }
-    if (result.value === "missing") {
-      console.log("Already logged out.");
-      return;
-    }
-    console.log("Logged out.");
+    console.log(formatAuthLogout(result.value, format));
   });
 
 issue

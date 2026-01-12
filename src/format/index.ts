@@ -5,6 +5,7 @@ import {
   type BacklogIssueComment,
   type BacklogUser,
 } from "../api/index.js";
+import type { AuthStatus, LogoutStatus } from "../auth/index.js";
 
 export type OutputFormat = "md" | "json" | "text";
 
@@ -115,6 +116,61 @@ export const formatError = (error: Error, format: OutputFormat): string => {
     return JSON.stringify({ error: payload }, null, 2);
   }
   return formatFriendlyError(payload);
+};
+
+export const formatAuthLogin = (value: { space: string; host: string }, format: OutputFormat): string => {
+  if (format === "json") {
+    return JSON.stringify(value, null, 2);
+  }
+  if (format === "md") {
+    return ["# Auth Login", "", `- Space: ${value.space}`, `- Host: ${value.host}`].join("\n");
+  }
+  return `Logged in as ${value.space}.${value.host}`;
+};
+
+export const formatAuthStatus = (value: AuthStatus, format: OutputFormat): string => {
+  const hasAuth = Boolean(value.space || value.apiKeyMasked);
+  if (format === "json") {
+    return JSON.stringify(value, null, 2);
+  }
+  if (!hasAuth) {
+    return "Not logged in.";
+  }
+
+  const host = value.host ?? "(not set)";
+  const apiKey = value.apiKeyMasked ?? "(not set)";
+
+  if (format === "md") {
+    const lines = ["# Auth Status", ""];
+    if (value.space) {
+      lines.push(`- Space: ${value.space}`);
+    }
+    lines.push(`- Host: ${host}`);
+    lines.push(`- API Key: ${apiKey}`);
+    return lines.join("\n");
+  }
+
+  const lines: string[] = [];
+  if (value.space) {
+    lines.push(`Space: ${value.space}`);
+  }
+  if (value.host) {
+    lines.push(`Host: ${value.host}`);
+  }
+  lines.push(`API Key: ${apiKey}`);
+  return lines.join("\n");
+};
+
+export const formatAuthLogout = (status: LogoutStatus, format: OutputFormat): string => {
+  if (format === "json") {
+    return JSON.stringify({ status }, null, 2);
+  }
+
+  const message = status === "missing" ? "Already logged out." : "Logged out.";
+  if (format === "md") {
+    return ["# Auth Logout", "", message].join("\n");
+  }
+  return message;
 };
 
 export const formatIssue = (
