@@ -1,4 +1,10 @@
-import { isApiError, type ApiErrorInfo, type BacklogIssue, type BacklogUser } from "../api/index.js";
+import {
+  isApiError,
+  type ApiErrorInfo,
+  type BacklogIssue,
+  type BacklogIssueComment,
+  type BacklogUser,
+} from "../api/index.js";
 
 export type OutputFormat = "md" | "json" | "text";
 
@@ -14,20 +20,30 @@ type ErrorPayload = {
   url?: string;
 };
 
+export type CommentDraft = {
+  issueIdOrKey: string;
+  content: string;
+  notifiedUserIds: number[];
+};
+
+const formatUser = (user: BacklogUser | null | undefined, fallback: string): string => {
+  if (!user) {
+    return fallback;
+  }
+  if (user.name && user.userId) {
+    return `${user.name} (${user.userId})`;
+  }
+  if (user.name) {
+    return user.name;
+  }
+  if (user.userId) {
+    return user.userId;
+  }
+  return `User ${user.id}`;
+};
+
 const formatAssignee = (assignee: BacklogUser | null | undefined): string => {
-  if (!assignee) {
-    return "(unassigned)";
-  }
-  if (assignee.name && assignee.userId) {
-    return `${assignee.name} (${assignee.userId})`;
-  }
-  if (assignee.name) {
-    return assignee.name;
-  }
-  if (assignee.userId) {
-    return assignee.userId;
-  }
-  return `User ${assignee.id}`;
+  return formatUser(assignee, "(unassigned)");
 };
 
 const toIssueTitle = (issue: BacklogIssue): string => {
@@ -40,6 +56,26 @@ const toIssueUrl = (issue: BacklogIssue, context?: FormatContext): string | unde
     return undefined;
   }
   return `${context.baseUrl}/view/${issue.issueKey}`;
+};
+
+const formatCommentContent = (content: string | null | undefined): string => {
+  const trimmed = content?.trim();
+  if (!trimmed) {
+    return "(no content)";
+  }
+  return trimmed;
+};
+
+const summarizeContent = (content: string | null | undefined, length = 50): string => {
+  const compact = (content ?? "").replace(/\s+/g, " ").trim();
+  if (!compact) {
+    return "(no content)";
+  }
+  if (compact.length <= length) {
+    return compact;
+  }
+  const safeLength = Math.max(0, length - 3);
+  return `${compact.slice(0, safeLength)}...`;
 };
 
 const toErrorPayload = (error: Error): ErrorPayload => {
@@ -152,4 +188,76 @@ export const formatIssueList = (
       return `- ${display} ${summary} (Status: ${status})`.trim();
     })
     .join("\n");
+};
+
+export const formatComment = (comment: BacklogIssueComment, format: OutputFormat): string => {
+  if (format === "json") {
+    return JSON.stringify(comment, null, 2);
+  }
+
+  const author = formatUser(comment.createdUser, "(unknown)");
+  const created = comment.created ?? "(unknown)";
+  const updated = comment.updated ?? "";
+  const content = formatCommentContent(comment.content);
+
+  if (format === "text") {
+    const lines = [`Comment ${comment.id} by ${author} at ${created}`];
+    if (updated) {
+      lines.push(`Updated: ${updated}`);
+    }
+    lines.push("", content);
+    return lines.join("\n");
+  }
+
+  const lines = [
+    `## Comment ${comment.id}`,
+    "",
+    `- Author: ${author}`,
+    `- Created: ${created}`,
+  ];
+  if (updated) {
+    lines.push(`- Updated: ${updated}`);
+  }
+  lines.push("", content);
+  return lines.join("\n");
+};
+
+export const formatCommentList = (comments: BacklogIssueComment[], format: OutputFormat): string => {
+  if (format === "json") {
+    return JSON.stringify(comments, null, 2);
+  }
+
+  if (comments.length === 0) {
+    return "No comments found.";
+  }
+
+  if (format === "text") {
+    return comments
+      .map((comment) => {
+        const author = formatUser(comment.createdUser, "(unknown)");
+        const created = comment.created ?? "(unknown)";
+        const summary = summarizeContent(comment.content);
+        return `Comment by ${author} at ${created}: ${summary}`;
+      })
+      .join("\n");
+  }
+
+  return comments.map((comment) => formatComment(comment, "md")).join("\n\n");
+};
+
+export const formatCommentDraft = (draft: CommentDraft, format: OutputFormat): string => {
+  if (format === "json") {
+    return JSON.stringify({ dryRun: true, ...draft }, null, 2);
+  }
+
+  const notify = draft.notifiedUserIds.length > 0 ? draft.notifiedUserIds.join(", ") : "(none)";
+  const content = formatCommentContent(draft.content);
+
+  if (format === "text") {
+    return `Dry run: comment to ${draft.issueIdOrKey}\nNotify: ${notify}\n\n${content}`;
+  }
+
+  return ["# Dry Run", "", `- Issue: ${draft.issueIdOrKey}`, `- Notify: ${notify}`, "", "## Content", content].join(
+    "\n",
+  );
 };

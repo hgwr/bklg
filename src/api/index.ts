@@ -52,6 +52,15 @@ export type BacklogIssue = {
   dueDate?: string | null;
 };
 
+export type BacklogIssueComment = {
+  id: number;
+  content?: string | null;
+  created?: string;
+  updated?: string;
+  createdUser?: BacklogUser;
+  updatedUser?: BacklogUser;
+};
+
 export type IssueSearchParams = {
   projectId?: string[];
   statusId?: number[];
@@ -61,6 +70,11 @@ export type IssueSearchParams = {
   offset?: number;
   sort?: string;
   order?: string;
+};
+
+export type IssueCommentInput = {
+  content: string;
+  notifiedUserIds?: number[];
 };
 
 type QueryValue = string | number | boolean;
@@ -230,6 +244,40 @@ export const getMyself = async (
 ): Promise<Result<BacklogUser>> => {
   return requestJson<BacklogUser>(auth, {
     path: "users/myself",
+    debug: options.debug ?? false,
+  });
+};
+
+export const getIssueComments = async (
+  auth: ApiAuth,
+  issueIdOrKey: string,
+  options: { debug?: boolean } = {},
+): Promise<Result<BacklogIssueComment[]>> => {
+  return requestJson<BacklogIssueComment[]>(auth, {
+    path: `issues/${encodeURIComponent(issueIdOrKey)}/comments`,
+    debug: options.debug ?? false,
+  });
+};
+
+export const postIssueComment = async (
+  auth: ApiAuth,
+  issueIdOrKey: string,
+  input: IssueCommentInput,
+  options: { debug?: boolean } = {},
+): Promise<Result<BacklogIssueComment>> => {
+  const body = new URLSearchParams();
+  body.set("content", input.content);
+
+  if (input.notifiedUserIds && input.notifiedUserIds.length > 0) {
+    for (const userId of input.notifiedUserIds) {
+      body.append("notifiedUserId[]", String(userId));
+    }
+  }
+
+  return requestJson<BacklogIssueComment>(auth, {
+    path: `issues/${encodeURIComponent(issueIdOrKey)}/comments`,
+    method: "POST",
+    body,
     debug: options.debug ?? false,
   });
 };
