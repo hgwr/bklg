@@ -192,6 +192,16 @@ Output
 
 - API: `GET /api/v2/wikis` + `GET /api/v2/wikis/:wikiId` など
 
+Usage
+
+- `bklg wiki view "Wiki Page" --project PROJ`
+
+Output
+
+- `text`: `Wiki: <name>` + 本文
+- `md`: 見出し + メタ情報 + 本文
+- `json`: APIレスポンス
+
 ## 3. エラー仕様
 
 - 401/403: 認証（APIキー・権限）問題として明示

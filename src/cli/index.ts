@@ -3,8 +3,11 @@ import fs from "node:fs/promises";
 
 import { Command, InvalidArgumentError, Option } from "commander";
 import {
+  ApiError,
   getIssue,
   getIssueComments,
+  getWiki,
+  getWikis,
   getMyself,
   postIssueComment,
   searchIssues,
@@ -23,6 +26,7 @@ import {
   formatError,
   formatIssue,
   formatIssueList,
+  formatWiki,
   type OutputFormat,
 } from "../format/index.js";
 import { err, isNonEmptyString, ok, toError, type Result } from "../utils/index.js";
@@ -40,6 +44,7 @@ program
 
 const auth = program.command("auth").description("Authentication commands");
 const issue = program.command("issue").description("Issue commands");
+const wiki = program.command("wiki").description("Wiki commands");
 
 const toAuthInput = (opts: { space?: string; host?: string; apiKey?: string }): AuthInput => {
   const input: AuthInput = {};
@@ -461,6 +466,46 @@ issue
     }
 
     console.log(formatIssueList(result.value, context.format, { baseUrl: context.baseUrl }));
+  });
+
+wiki
+  .command("view")
+  .description("View a wiki page by name")
+  .argument("<pageName>", "Wiki page name")
+  .requiredOption("--project <projectKey>", "Project key for the wiki")
+  .action(async (pageName: string, opts: { project: string }) => {
+    const context = await resolveCommandContext();
+    if (!context) {
+      return;
+    }
+
+    const listResult = await getWikis(context.auth, { projectIdOrKey: opts.project }, { debug: context.debug });
+    if (!listResult.ok) {
+      writeError(listResult.error, context.format);
+      return;
+    }
+
+    const wikiSummary = listResult.value.find((entry) => entry.name === pageName);
+    if (!wikiSummary) {
+      writeError(
+        new ApiError({
+          status: 404,
+          statusText: "Not Found",
+          url: `wiki:${pageName} in project ${opts.project}`,
+          body: { pageName, project: opts.project },
+        }),
+        context.format,
+      );
+      return;
+    }
+
+    const detailResult = await getWiki(context.auth, wikiSummary.id, { debug: context.debug });
+    if (!detailResult.ok) {
+      writeError(detailResult.error, context.format);
+      return;
+    }
+
+    console.log(formatWiki(detailResult.value, context.format));
   });
 
 void program.parseAsync();
