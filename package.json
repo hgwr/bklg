@@ -1,6 +1,6 @@
 {
   "name": "bklg",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "bklg is a simple wrapper around the backlog.jp API v2.",
   "homepage": "https://github.com/hgwr/bklg#readme",
   "repository": {
