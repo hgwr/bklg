@@ -281,10 +281,72 @@ export const getIssueComments = async (
   issueIdOrKey: string,
   options: { debug?: boolean } = {},
 ): Promise<Result<BacklogIssueComment[]>> => {
-  return requestJson<BacklogIssueComment[]>(auth, {
-    path: `issues/${encodeURIComponent(issueIdOrKey)}/comments`,
-    debug: options.debug ?? false,
-  });
+  const pageSize = 100;
+  const comments: BacklogIssueComment[] = [];
+  const path = `issues/${encodeURIComponent(issueIdOrKey)}/comments`;
+
+  let minId: number | undefined;
+  let maxId: number | undefined;
+  let isDescendingOrder: boolean | undefined;
+  let previousEdgeId: number | undefined;
+
+  while (true) {
+    const query: Record<string, QueryValues | undefined> = { count: pageSize };
+    if (minId !== undefined) {
+      query.minId = minId;
+    }
+    if (maxId !== undefined) {
+      query.maxId = maxId;
+    }
+
+    const pageResult = await requestJson<BacklogIssueComment[]>(auth, {
+      path,
+      query,
+      debug: options.debug ?? false,
+    });
+    if (!pageResult.ok) {
+      return pageResult;
+    }
+
+    const page = pageResult.value;
+    if (page.length === 0) {
+      break;
+    }
+
+    comments.push(...page);
+
+    if (page.length < pageSize) {
+      break;
+    }
+
+    const firstId = page[0]?.id;
+    const lastId = page.at(-1)?.id;
+    if (firstId === undefined || lastId === undefined) {
+      break;
+    }
+
+    if (isDescendingOrder === undefined) {
+      isDescendingOrder = firstId > lastId;
+    }
+
+    if (previousEdgeId !== undefined && previousEdgeId === lastId) {
+      break;
+    }
+    previousEdgeId = lastId;
+
+    if (isDescendingOrder) {
+      maxId = lastId - 1;
+      if (maxId < 0) {
+        break;
+      }
+      minId = undefined;
+    } else {
+      minId = lastId + 1;
+      maxId = undefined;
+    }
+  }
+
+  return ok(comments);
 };
 
 export const postIssueComment = async (

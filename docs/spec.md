@@ -187,6 +187,7 @@ Output
 #### 2.3.4 コメント一覧取得 `bklg issue comments <issueKeyOrId>`
 
 課題のコメント一覧を取得します。
+コメントが多い場合も API ページングを自動で辿って全件取得します。
 
 - API: `GET /api/v2/issues/:issueIdOrKey/comments`
 
