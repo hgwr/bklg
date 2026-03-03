@@ -54,6 +54,12 @@
 - `--host <backlog.jp|backlog.com|...>`（既定：config/env/`backlog.jp`）
 - `--api-key <key>`（既定：config/env）
 
+`-h` / `--help` は各サブコマンドでも利用でき、次を表示すること:
+
+- そのコマンドの `Usage`
+- 親コマンドの共通オプション（Global Options）
+- 実行例（Examples）と注意事項（必要な入力、排他オプションなど）
+
 ### 2.2 auth
 
 #### 2.2.1 `bklg auth login`

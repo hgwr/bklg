@@ -33,14 +33,34 @@ import { err, isNonEmptyString, ok, toError, type Result } from "../utils/index.
 
 const program = new Command();
 
+const rootHelpText = `
+Auth resolution order (highest first):
+  1) CLI args: --space, --host, --api-key
+  2) Env vars: BACKLOG_SPACE, BACKLOG_HOST, BACKLOG_API_KEY
+  3) Config file: ~/.config/bklg/config.json
+
+Output format:
+  md    AI/editor-friendly structured Markdown
+  json  Backlog API-like JSON output (default)
+  text  Compact human-readable text
+
+Examples:
+  $ bklg auth login --space your-space --api-key YOUR_API_KEY
+  $ bklg issue view PROJ-123 --format md
+  $ bklg issue search --project 123 --status 1 --assignee me --format text
+`;
+
 program
   .name("bklg")
   .description("Backlog API v2 thin wrapper CLI")
-  .option("--format <format>", "output format (md|json|text)", "json")
+  .configureHelp({ showGlobalOptions: true })
+  .showSuggestionAfterError(true)
+  .addOption(new Option("--format <format>", "output format").choices(["md", "json", "text"]).default("json"))
   .option("--debug", "show debug logging", false)
-  .addOption(new Option("--space <space>", "backlog space").env("BACKLOG_SPACE"))
-  .addOption(new Option("--host <host>", "backlog host").env("BACKLOG_HOST"))
-  .addOption(new Option("--api-key <key>", "backlog api key").env("BACKLOG_API_KEY"));
+  .addOption(new Option("--space <space>", "backlog space (required for authenticated commands)").env("BACKLOG_SPACE"))
+  .addOption(new Option("--host <host>", "backlog host (e.g. backlog.jp, backlog.com)").env("BACKLOG_HOST"))
+  .addOption(new Option("--api-key <key>", "backlog api key (required for authenticated commands)").env("BACKLOG_API_KEY"))
+  .addHelpText("after", rootHelpText);
 
 const auth = program.command("auth").description("Authentication commands");
 const issue = program.command("issue").description("Issue commands");
@@ -296,6 +316,18 @@ const parseNotifyIds = (value: string | undefined): Result<number[]> => {
 auth
   .command("login")
   .description("Save API key to local config")
+  .usage("--space <space> [--host <host>] --api-key <key>")
+  .addHelpText(
+    "after",
+    `
+Required:
+  --space and --api-key must be provided from args or env.
+
+Examples:
+  $ bklg auth login --space hgwr --api-key YOUR_API_KEY
+  $ bklg auth login --space hgwr --host backlog.com --api-key YOUR_API_KEY
+`,
+  )
   .action(
     withOutputFormat(async (format) => {
     const opts = program.opts<{ space?: string; host?: string; apiKey?: string }>();
@@ -311,7 +343,16 @@ auth
 
 auth
   .command("status")
-  .description("Show current auth settings")
+  .description("Show current auth settings (API key is masked)")
+  .usage("[options]")
+  .addHelpText(
+    "after",
+    `
+Examples:
+  $ bklg auth status
+  $ bklg auth status --format md
+`,
+  )
   .action(
     withOutputFormat(async (format) => {
     const opts = program.opts<{ space?: string; host?: string; apiKey?: string }>();
@@ -329,6 +370,15 @@ auth
 auth
   .command("logout")
   .description("Remove stored API key")
+  .usage("[options]")
+  .addHelpText(
+    "after",
+    `
+Examples:
+  $ bklg auth logout
+  $ bklg auth logout --format md
+`,
+  )
   .action(
     withOutputFormat(async (format) => {
     const result = await logout();
@@ -343,7 +393,16 @@ auth
 issue
   .command("view")
   .description("View an issue by key or id")
+  .usage("<issueKeyOrId> [options]")
   .argument("<issueKeyOrId>", "Issue key (PROJ-123) or numeric id")
+  .addHelpText(
+    "after",
+    `
+Examples:
+  $ bklg issue view PROJ-123
+  $ bklg issue view 12345 --format md
+`,
+  )
   .action(async (issueKeyOrId: string) => {
     const context = await resolveCommandContext();
     if (!context) {
@@ -362,7 +421,16 @@ issue
 issue
   .command("comments")
   .description("List issue comments")
+  .usage("<issueKeyOrId> [options]")
   .argument("<issueKeyOrId>", "Issue key (PROJ-123) or numeric id")
+  .addHelpText(
+    "after",
+    `
+Examples:
+  $ bklg issue comments PROJ-123 --format text
+  $ bklg issue comments 12345 --format md
+`,
+  )
   .action(async (issueKeyOrId: string) => {
     const context = await resolveCommandContext();
     if (!context) {
@@ -381,11 +449,25 @@ issue
 issue
   .command("writeComment")
   .description("Write a comment to an issue")
+  .usage("<issueKeyOrId> (-m <text> | --message-file <path>) [options]")
   .argument("<issueKeyOrId>", "Issue key (PROJ-123) or numeric id")
   .addOption(new Option("-m, --message <text>", "comment content").conflicts("messageFile"))
   .addOption(new Option("--message-file <path>", "comment content file").conflicts("message"))
   .option("--notify <userIdCSV>", "notify user IDs (comma-separated)")
   .option("--dry-run", "show comment without posting", false)
+  .addHelpText(
+    "after",
+    `
+Notes:
+  --message and --message-file are mutually exclusive.
+  --notify accepts comma-separated numeric Backlog user IDs.
+
+Examples:
+  $ bklg issue writeComment PROJ-123 -m "Please review"
+  $ bklg issue writeComment PROJ-123 --message-file ./comment.md --notify 1001,1002
+  $ bklg issue writeComment PROJ-123 -m "draft only" --dry-run --format md
+`,
+  )
   .action(async (issueKeyOrId: string, writeOpts: WriteCommentOptions) => {
     const context = await resolveCommandContext();
     if (!context) {
@@ -439,6 +521,7 @@ issue
 issue
   .command("search")
   .description("Search issues")
+  .usage("[options]")
   .option("--project <projectId>", "project id (repeatable)", collectValues, [])
   .option("--status <statusId>", "status id (numeric)")
   .option("--assignee <assignee>", "assignee id (numeric) or 'me'")
@@ -447,6 +530,18 @@ issue
   .option("--offset <n>", "offset", parseNumberOption)
   .option("--sort <created|updated|dueDate>", "sort field")
   .option("--order <asc|desc>", "sort order")
+  .addHelpText(
+    "after",
+    `
+Notes:
+  --project can be repeated: --project 1 --project 2
+  --status and numeric --assignee use Backlog IDs.
+
+Examples:
+  $ bklg issue search --project 123 --status 1 --assignee me --format md
+  $ bklg issue search --keyword "login" --count 20 --order desc --format text
+`,
+  )
   .action(async (searchOpts: SearchOptions) => {
     const context = await resolveCommandContext();
     if (!context) {
@@ -471,8 +566,17 @@ issue
 wiki
   .command("view")
   .description("View a wiki page by name")
+  .usage("<pageName> --project <projectKeyOrId> [options]")
   .argument("<pageName>", "Wiki page name")
   .requiredOption("--project <projectKey>", "Project key for the wiki")
+  .addHelpText(
+    "after",
+    `
+Examples:
+  $ bklg wiki view "Wiki Page" --project PROJ --format md
+  $ bklg wiki view "API Rules" --project 123 --format json
+`,
+  )
   .action(async (pageName: string, opts: { project: string }) => {
     const context = await resolveCommandContext();
     if (!context) {
