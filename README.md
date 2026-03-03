@@ -90,6 +90,12 @@ bklg issue writeComment PROJ-123 -m "Please review the fix."
 
 See `docs/spec.md` for the full CLI spec.
 
+## Help Tips
+
+- Use `bklg <command> -h` to see usage with examples.
+- Subcommand help also shows global options like `--format`, `--space`, and `--api-key`.
+- `bklg auth login -h` explains required inputs (`--space`, `--api-key`) and host examples.
+
 ## Configuration
 
 Priority order (highest first):

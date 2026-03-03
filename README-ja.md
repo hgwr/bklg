@@ -90,6 +90,12 @@ bklg issue writeComment PROJ-123 -m "受け入れ条件を満たす修正を入�
 
 詳細は `docs/spec.md` を参照してください。
 
+## ヘルプ活用
+
+- `bklg <command> -h` で、使い方と実行例を確認できます。
+- サブコマンドのヘルプにも `--format` / `--space` / `--api-key` など共通オプションが表示されます。
+- `bklg auth login -h` では必須入力（`--space`, `--api-key`）と `--host` の指定例を確認できます。
+
 ## 設定
 
 優先順位（高い順）
