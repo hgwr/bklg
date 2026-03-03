@@ -8,6 +8,7 @@ It aims to make issues and wiki pages easy to work with from terminals and edito
 ## Features
 
 - View/search issues and post comments from the CLI
+- List issue comments completely, even when there are many (auto-pagination)
 - Switch output with `--format md|json|text`
 - Keep a thin mapping to Backlog API resources
 - Store auth locally, override with environment variables
