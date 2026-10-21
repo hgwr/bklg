@@ -106,10 +106,31 @@ Priority order (highest first):
 
 `bklg auth login` creates the config file.
 
+## Proxy
+
+If your Backlog space restricts source IP addresses ("Access from your IP Address is forbidden."),
+route requests through an allowed proxy. bklg picks a proxy in this order:
+
+1. `NO_PROXY` / `no_proxy` matches the Backlog host: connect directly
+2. `HTTPS_PROXY` / `https_proxy`, then `HTTP_PROXY` / `http_proxy`
+3. OS proxy settings: macOS network settings and Windows Internet Options, including PAC files
+   (Linux: env vars only)
+
+```bash
+export HTTPS_PROXY=http://proxy.example.com:8080
+# Proxy credentials (also applied to proxies found in OS settings / PAC):
+export BKLG_PROXY_USERNAME=your-user
+export BKLG_PROXY_PASSWORD=your-password
+# Or embed them (percent-encode symbols): http://user:p%40ss@proxy.example.com:8080
+```
+
+Run with `--debug` to see which proxy was chosen and why.
+
 ## Security Notes
 
 - API keys are sensitive. Do not share them.
 - Prefer env vars in CI.
+- Proxy credentials are never printed, including with `--debug`.
 
 ## Development
 

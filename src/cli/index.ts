@@ -39,6 +39,13 @@ Auth resolution order (highest first):
   2) Env vars: BACKLOG_SPACE, BACKLOG_HOST, BACKLOG_API_KEY
   3) Config file: ~/.config/bklg/config.json
 
+Proxy resolution order (highest first):
+  1) NO_PROXY / no_proxy match: connect directly
+  2) Env vars: HTTPS_PROXY, then HTTP_PROXY (http://[user:pass@]host:port)
+  3) OS settings: macOS network proxies / Windows Internet Options (PAC supported)
+  Proxy credentials: BKLG_PROXY_USERNAME, BKLG_PROXY_PASSWORD
+  Use --debug to see which proxy is used.
+
 Output format:
   md    AI/editor-friendly structured Markdown
   json  Backlog API-like JSON output (default)
