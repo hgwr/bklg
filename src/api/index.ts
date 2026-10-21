@@ -1,4 +1,9 @@
+import { STATUS_CODES, type IncomingHttpHeaders } from "node:http";
+
+import { request, type Dispatcher } from "undici";
+
 import { err, ok, toError, type Result } from "../utils/index.js";
+import { describeProxy, getProxyTransport, type ProxyTransport } from "./proxy.js";
 
 export type ApiAuth = {
   space: string;
@@ -24,6 +29,26 @@ export class ApiError extends Error {
 }
 
 export const isApiError = (error: Error): error is ApiError => error instanceof ApiError;
+
+export type ProxyErrorInfo = {
+  proxy: string;
+  // Status of the proxy's CONNECT response, when the proxy refused the tunnel.
+  status?: number;
+  statusText?: string;
+  url: string;
+};
+
+export class ProxyError extends Error {
+  info: ProxyErrorInfo;
+
+  constructor(info: ProxyErrorInfo, message: string) {
+    super(message);
+    this.name = "ProxyError";
+    this.info = info;
+  }
+}
+
+export const isProxyError = (error: Error): error is ProxyError => error instanceof ProxyError;
 
 export type BacklogUser = {
   id: number;
@@ -141,33 +166,92 @@ const maskApiKey = (url: URL): string => {
   return masked.toString();
 };
 
-const pickHeaders = (headers: Headers, names: string[]): string[] => {
+const pickHeaders = (headers: IncomingHttpHeaders, names: string[]): string[] => {
   const lines: string[] = [];
   for (const name of names) {
-    const value = headers.get(name);
+    const value = headers[name];
     if (value) {
-      lines.push(`${name}: ${value}`);
+      lines.push(`${name}: ${Array.isArray(value) ? value.join(", ") : value}`);
     }
   }
   return lines;
 };
 
-const parseResponseBody = async (response: Response): Promise<unknown> => {
-  const raw = await response.text();
-  if (!raw) {
+type HttpResponse = {
+  status: number;
+  statusText: string;
+  headers: IncomingHttpHeaders;
+  raw: string;
+};
+
+const parseResponseBody = (response: HttpResponse): unknown => {
+  if (!response.raw) {
     return undefined;
   }
 
-  const contentType = response.headers.get("content-type") ?? "";
+  const contentType = String(response.headers["content-type"] ?? "");
   if (contentType.includes("application/json")) {
     try {
-      return JSON.parse(raw) as unknown;
+      return JSON.parse(response.raw) as unknown;
     } catch {
-      return raw;
+      return response.raw;
     }
   }
 
-  return raw;
+  return response.raw;
+};
+
+const toProxyError = (error: Error, transport: ProxyTransport, safeUrl: string): ProxyError => {
+  const proxy = describeProxy(transport.decision);
+  // undici reports a refused CONNECT as "Proxy response (407) !== 200 when HTTP Tunneling".
+  const tunnelStatus = /Proxy response \((\d{3})\)/.exec(error.message)?.[1];
+
+  if (tunnelStatus) {
+    const status = Number(tunnelStatus);
+    return new ProxyError(
+      { proxy, status, statusText: STATUS_CODES[status] ?? "Unknown", url: safeUrl },
+      `Proxy refused the connection (${status} ${STATUS_CODES[status] ?? "Unknown"})`,
+    );
+  }
+
+  return new ProxyError({ proxy, url: safeUrl }, `Request via proxy failed: ${error.message}`);
+};
+
+const sendRequest = async (
+  url: URL,
+  safeUrl: string,
+  method: "GET" | "POST",
+  body: URLSearchParams | undefined,
+  transport: ProxyTransport,
+): Promise<Result<HttpResponse>> => {
+  const options: {
+    method: "GET" | "POST";
+    headers?: Record<string, string>;
+    body?: string;
+    dispatcher?: Dispatcher;
+  } = { method };
+
+  if (body !== undefined) {
+    options.headers = { "content-type": "application/x-www-form-urlencoded;charset=UTF-8" };
+    options.body = body.toString();
+  }
+
+  if (transport.dispatcher) {
+    options.dispatcher = transport.dispatcher;
+  }
+
+  try {
+    const response = await request(url, options);
+    return ok({
+      status: response.statusCode,
+      statusText: STATUS_CODES[response.statusCode] ?? "",
+      headers: response.headers,
+      raw: await response.body.text(),
+    });
+  } catch (error) {
+    const cause = toError(error);
+    return err(transport.decision.proxy ? toProxyError(cause, transport, safeUrl) : cause);
+  }
 };
 
 const requestJson = async <T>(auth: ApiAuth, input: RequestInput): Promise<Result<T>> => {
@@ -186,17 +270,26 @@ const requestJson = async <T>(auth: ApiAuth, input: RequestInput): Promise<Resul
 
     const safeUrl = maskApiKey(url);
     const method = input.method ?? "GET";
+    const log = input.debug ? (message: string) => console.error(`[bklg] ${message}`) : undefined;
 
-    if (input.debug) {
-      console.error(`[bklg] ${method} ${safeUrl}`);
+    const transportResult = await getProxyTransport(url, log);
+    if (!transportResult.ok) {
+      return err(transportResult.error);
     }
 
-    const requestInit: RequestInit = { method };
-    if (input.body !== undefined) {
-      requestInit.body = input.body;
-    }
+    log?.(`${method} ${safeUrl}`);
 
-    const response = await fetch(url.toString(), requestInit);
+    const responseResult = await sendRequest(
+      url,
+      safeUrl,
+      method,
+      input.body,
+      transportResult.value,
+    );
+    if (!responseResult.ok) {
+      return err(responseResult.error);
+    }
+    const response = responseResult.value;
 
     if (input.debug) {
       console.error(`[bklg] status ${response.status} ${response.statusText}`);
@@ -213,9 +306,9 @@ const requestJson = async <T>(auth: ApiAuth, input: RequestInput): Promise<Resul
       }
     }
 
-    const body = await parseResponseBody(response);
+    const body = parseResponseBody(response);
 
-    if (!response.ok) {
+    if (response.status < 200 || response.status >= 300) {
       return err(
         new ApiError({
           status: response.status,

@@ -44,6 +44,43 @@
 
 例: `https://example.backlog.jp/api/v2/...`
 
+### 1.4 プロキシ
+
+Backlog スペースに接続元 IP アドレス制限がある場合などに備え、HTTP プロキシ経由で API にアクセスできる。
+Backlog への通信は常に `https://` なので、プロキシには `CONNECT` でトンネルを張る。
+
+#### 優先順位
+
+1. `NO_PROXY` / `no_proxy` が接続先ホストに一致したら直接接続
+2. 環境変数 `HTTPS_PROXY` / `https_proxy`、無ければ `HTTP_PROXY` / `http_proxy`
+3. OS のプロキシ設定
+   - macOS: `scutil --proxy`（自動プロキシ構成 PAC → 保護された Web プロキシ（HTTPS）の順）
+   - Windows: `HKCU\Software\Microsoft\Windows\CurrentVersion\Internet Settings`（`AutoConfigURL` の PAC → `ProxyEnable`/`ProxyServer` の順）
+   - その他の OS は環境変数のみ
+4. 直接接続
+
+#### 環境変数
+
+- `HTTPS_PROXY` / `HTTP_PROXY`: `http://host:port`、`https://host:port`、`host:port`。`http://user:pass@host:port` で認証情報も指定できる（記号はパーセントエンコード）。SOCKS は未対応（エラー）。
+- `NO_PROXY`: カンマ/空白区切り。`example.com`（サブドメインも一致）、`.example.com`、`*.example.com`、`host:port`、`*`（全ホスト）。OS 設定由来のプロキシにも適用する。
+- `BKLG_PROXY_USERNAME` / `BKLG_PROXY_PASSWORD`: URL に認証情報を含まないプロキシ（PAC や OS 設定由来を含む）に Basic 認証で送る。
+
+#### PAC
+
+- PAC ファイルはプロキシを通さず直接取得する（`http(s)://` / `file://`、タイムアウト 10 秒）。
+- `FindProxyForURL()` は QuickJS（WebAssembly）のサンドボックスで実行する。
+- 結果の先頭から `PROXY` / `HTTPS` / `DIRECT` のうち最初のものを使う。`SOCKS` などは読み飛ばす。
+- PAC の取得・評価に失敗した場合は、OS の HTTPS プロキシ設定、無ければ直接接続にフォールバックする。
+- OS のバイパスリスト（macOS `ExceptionsList`、Windows `ProxyOverride`）は手動設定のプロキシにのみ適用する（PAC は PAC 自身が判断する）。
+
+#### デバッグ
+
+`--debug` で使用するプロキシと決定元を stderr に出す（認証情報は出さない）。
+
+```
+[bklg] proxy http://proxy.example.com:8080 (with credentials) (source: macOS PAC https://pac.example.com/proxy.pac)
+```
+
 ## 2. コマンド仕様
 
 ### 2.1 共通オプション
@@ -225,10 +262,14 @@ Output
 
 ## 3. エラー仕様
 
-- 401/403: 認証（APIキー・権限）問題として明示
+- 401/403: 認証（APIキー・権限）問題として明示。Backlog のエラーメッセージ（`errors[].message`）があれば併記する
+  - 403 で接続元 IP アドレス制限（`Access from your IP Address is forbidden.`）の場合は、プロキシ設定を促す
 - 404: 対象が存在しない（issueKeyの誤りなど）
 - 429: レート制限（再試行を促す）
 - ネットワークエラー: 接続先 host/space の誤りを疑う文言
+- プロキシエラー: プロキシ経由で失敗した場合は、使用したプロキシを明示する
+  - 407: プロキシ認証が必要（`BKLG_PROXY_USERNAME`/`BKLG_PROXY_PASSWORD` または `HTTPS_PROXY` の認証情報を促す）
+  - その他の CONNECT 拒否: プロキシのステータスを表示
 
 `--format json` の場合は、エラーも JSON で出す（例）
 
@@ -244,16 +285,32 @@ Output
 }
 ```
 
+プロキシエラーの JSON 例（`proxy` に使用したプロキシ、`status` にプロキシの応答）
+
+```json
+{
+  "error": {
+    "message": "Proxy refused the connection (407 Proxy Authentication Required)",
+    "status": 407,
+    "statusText": "Proxy Authentication Required",
+    "proxy": "http://proxy.example.com:8080",
+    "url": "https://your-space.backlog.jp/api/v2/issues/PROJ-1?apiKey=***"
+  }
+}
+```
+
 ## 4. セキュリティ
 
 - APIキーはログ出力しない
 - 設定ファイルのパーミッションに注意（可能なら 600 を推奨）
 - `--debug` でもキーを出さない（URLに含めない／含む場合はマスク）
+- プロキシの認証情報もログ・エラー出力に出さない
 
 ## 5. 実装メモ（TypeScript）
 
 - CLI: commander
-- HTTP: fetch
+- HTTP: undici（`request()` + プロキシ時は `ProxyAgent`）
+- PAC: pac-resolver + quickjs-wasi
 - Form POST: `application/x-www-form-urlencoded`
 - 出力: `format/` に寄せて安定させる
 - acceptance criteria 抽出は「見出し検出（例：`## 受け入れ条件`）」があれば抽出、無ければ description をそのまま
