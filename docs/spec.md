@@ -312,6 +312,7 @@ Output
 
 ## 5. 実装メモ（TypeScript）
 
+- 実行環境: Node.js 22.19 以上（`package.json` の `engines`。undici 8 / commander 15 の要件）
 - CLI: commander
 - HTTP: undici（`request()` + プロキシ時は `ProxyAgent`）
 - PAC: pac-resolver + quickjs-wasi

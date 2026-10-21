@@ -1,6 +1,6 @@
 {
   "name": "bklg",
-  "version": "0.0.3",
+  "version": "0.1.0",
   "description": "bklg is a simple wrapper around the backlog.jp API v2.",
   "homepage": "https://github.com/hgwr/bklg#readme",
   "repository": {
@@ -25,18 +25,21 @@
   "license": "ISC",
   "type": "module",
   "dependencies": {
-    "commander": "^12.1.0",
+    "commander": "^15.0.0",
     "pac-resolver": "^9.0.1",
     "quickjs-wasi": "^2.2.0",
-    "undici": "^7.30.0"
+    "undici": "^8.12.3"
   },
   "devDependencies": {
-    "@types/node": "^22.13.4",
-    "eslint": "^9.19.0",
-    "eslint-config-prettier": "^10.0.1",
-    "prettier": "^3.4.2",
+    "@types/node": "^22.20.5",
+    "eslint": "^10.13.0",
+    "eslint-config-prettier": "^10.1.8",
+    "prettier": "^3.9.10",
     "tsx": "^4.23.15",
     "typescript": "^5.9.3",
-    "typescript-eslint": "^8.21.0"
+    "typescript-eslint": "^8.72.0"
+  },
+  "engines": {
+    "node": ">=22.19.0"
   }
 }

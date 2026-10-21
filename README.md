@@ -15,6 +15,8 @@ It aims to make issues and wiki pages easy to work with from terminals and edito
 
 ## Installation
 
+Requires Node.js 22.19 or later.
+
 ### npm (global)
 
 ```bash
@@ -136,7 +138,7 @@ Run with `--debug` to see which proxy was chosen and why.
 
 ### Requirements
 
-- Node.js (LTS recommended)
+- Node.js 22.19 or later
 - npm
 
 ### Setup

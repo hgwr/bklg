@@ -11,9 +11,7 @@ const PAC_DOWNLOAD_TIMEOUT_MS = 10_000;
 const PAC_EVALUATION_TIMEOUT_MS = 5_000;
 
 export type PacEntry =
-  | { type: "DIRECT" }
-  | { type: "PROXY"; url: URL }
-  | { type: "UNSUPPORTED"; value: string };
+  { type: "DIRECT" } | { type: "PROXY"; url: URL } | { type: "UNSUPPORTED"; value: string };
 
 // The PAC file itself is always fetched directly, as browsers do.
 export const loadPacScript = async (pacUrl: string): Promise<Result<string>> => {
