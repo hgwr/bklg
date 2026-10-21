@@ -1,5 +1,6 @@
 import {
   isApiError,
+  isProxyError,
   type ApiErrorInfo,
   type BacklogIssue,
   type BacklogIssueComment,
@@ -20,6 +21,7 @@ type ErrorPayload = {
   statusText?: string;
   details?: unknown;
   url?: string;
+  proxy?: string;
 };
 
 export type CommentDraft = {
@@ -92,12 +94,71 @@ const toErrorPayload = (error: Error): ErrorPayload => {
     };
   }
 
+  if (isProxyError(error)) {
+    const payload: ErrorPayload = { message: error.message };
+    if (error.info.status !== undefined) {
+      payload.status = error.info.status;
+    }
+    if (error.info.statusText !== undefined) {
+      payload.statusText = error.info.statusText;
+    }
+    payload.proxy = error.info.proxy;
+    payload.url = error.info.url;
+    return payload;
+  }
+
   return { message: error.message };
 };
 
+// Backlog error bodies look like { "errors": [{ "message": "...", "code": 4 }] }.
+const extractBacklogMessages = (details: unknown): string[] => {
+  if (!details || typeof details !== "object") {
+    return [];
+  }
+  const errors = (details as { errors?: unknown }).errors;
+  if (!Array.isArray(errors)) {
+    return [];
+  }
+  return errors
+    .map((entry: unknown) =>
+      entry && typeof entry === "object" ? (entry as { message?: unknown }).message : undefined,
+    )
+    .filter(
+      (message): message is string => typeof message === "string" && message.trim().length > 0,
+    )
+    .map((message) => message.trim());
+};
+
+const PROXY_CREDENTIALS_HINT =
+  "Set BKLG_PROXY_USERNAME/BKLG_PROXY_PASSWORD, or HTTPS_PROXY=http://USER:PASS@host:port.";
+
+const formatProxyError = (payload: ErrorPayload): string => {
+  const proxy = payload.proxy ?? "proxy";
+  if (payload.status === 407) {
+    return `Proxy authentication required by ${proxy}. ${PROXY_CREDENTIALS_HINT}`;
+  }
+  if (payload.status) {
+    return `Proxy ${proxy} refused the connection (${payload.status} ${payload.statusText ?? "Unknown"}).`;
+  }
+  return `${payload.message} (proxy: ${proxy})`;
+};
+
 const formatFriendlyError = (payload: ErrorPayload): string => {
-  if (payload.status === 401 || payload.status === 403) {
-    return "Authentication failed. Check --api-key/--space or BACKLOG_API_KEY/BACKLOG_SPACE.";
+  if (payload.proxy) {
+    return formatProxyError(payload);
+  }
+
+  const backlogMessages = extractBacklogMessages(payload.details);
+  const detail = backlogMessages.length > 0 ? ` Backlog: ${backlogMessages.join(" / ")}` : "";
+
+  if (payload.status === 401) {
+    return `Authentication failed. Check --api-key/--space or BACKLOG_API_KEY/BACKLOG_SPACE.${detail}`;
+  }
+  if (payload.status === 403) {
+    if (backlogMessages.some((message) => /IP Address/i.test(message))) {
+      return `Access denied by the space's IP address restriction.${detail}\nRoute requests through an allowed proxy with HTTPS_PROXY or the OS proxy settings (see --debug).`;
+    }
+    return `Access denied. Check the API key's user permissions.${detail}`;
   }
   if (payload.status === 404) {
     return "Not found. Check the resource name or your permissions.";

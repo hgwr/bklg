@@ -106,10 +106,31 @@ bklg issue writeComment PROJ-123 -m "受け入れ条件を満たす修正を入�
 
 設定ファイルは `bklg auth login` が作成します。
 
+## プロキシ
+
+Backlog スペースに接続元 IP アドレス制限がある場合（`Access from your IP Address is forbidden.`）は、
+許可されたプロキシ経由でアクセスできます。プロキシは次の順で決まります。
+
+1. `NO_PROXY` / `no_proxy` が Backlog のホストに一致：直接接続
+2. `HTTPS_PROXY` / `https_proxy`、無ければ `HTTP_PROXY` / `http_proxy`
+3. OS のプロキシ設定：macOS のネットワーク設定、Windows のインターネット オプション（PAC ファイルにも対応）
+   （Linux は環境変数のみ）
+
+```bash
+export HTTPS_PROXY=http://proxy.example.com:8080
+# プロキシの認証情報（OS 設定や PAC で見つかったプロキシにも使われます）
+export BKLG_PROXY_USERNAME=your-user
+export BKLG_PROXY_PASSWORD=your-password
+# URL に含めることもできます（記号はパーセントエンコード）: http://user:p%40ss@proxy.example.com:8080
+```
+
+`--debug` を付けると、どのプロキシをどこから決めたかを表示します。
+
 ## セキュリティ注意
 
 - APIキーはユーザー権限で Backlog へアクセスできる秘密情報なので共有しないでください。
 - CIでは環境変数による注入を推奨
+- プロキシの認証情報は `--debug` でも出力しません。
 
 ## 開発
 
