@@ -15,6 +15,8 @@ GitHub CLI の `gh` のように、ターミナルや VS Code から Backlog の
 
 ## インストール
 
+Node.js 22.19 以上が必要です。
+
 ### npm（グローバル）
 
 ```bash
@@ -136,7 +138,7 @@ export BKLG_PROXY_PASSWORD=your-password
 
 ### 必要要件
 
-- Node.js（LTS推奨）
+- Node.js 22.19 以上
 - npm
 
 ### セットアップ
