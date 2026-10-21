@@ -146,6 +146,40 @@ describe("resolveProxy", () => {
     assert.equal(logs.length, 1);
   });
 
+  it("falls back to the OS HTTPS proxy when the PAC file never finishes", async () => {
+    const logs: string[] = [];
+    const result = await resolveProxy(target, {
+      env: {},
+      readSystemSettings: system({
+        pacUrl: "https://pac.example.com/proxy.pac",
+        httpsProxy: "os.example.com:3128",
+      }),
+      loadPac: async () => ok("function FindProxyForURL(url, host) { while (true) {} }"),
+      pacTimeoutMs: 300,
+      log: (message) => logs.push(message),
+    });
+    assert.ok(result.ok);
+    assert.equal(describeProxy(result.value), "http://os.example.com:3128");
+    assert.match(logs.join("\n"), /timed out/);
+  });
+
+  it("keeps the apiKey out of the PAC file and the debug log", async () => {
+    const logs: string[] = [];
+    const result = await resolveProxy(
+      new URL("https://space.backlog.com/api/v2/issues/PROJ-1?apiKey=SECRET_KEY"),
+      {
+        env: {},
+        readSystemSettings: system({ pacUrl: "https://pac.example.com/proxy.pac" }),
+        loadPac: async () =>
+          ok("function FindProxyForURL(url, host) { alert(url); throw new Error(url); }"),
+        log: (message) => logs.push(message),
+      },
+    );
+    assert.ok(result.ok);
+    assert.equal(logs.length, 2);
+    assert.doesNotMatch(logs.join("\n"), /SECRET_KEY|api\/v2/);
+  });
+
   it("connects directly without any proxy settings", async () => {
     const result = await resolveProxy(target, { env: {}, readSystemSettings: noSystem });
     assert.deepEqual(result, { ok: true, value: { source: "default" } });

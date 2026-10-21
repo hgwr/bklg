@@ -29,6 +29,34 @@ describe("parseScutilProxy", () => {
     });
   });
 
+  it("ignores per-interface __SCOPED__ settings", () => {
+    const output = `<dictionary> {
+  ExceptionsList : <array> {
+    0 : *.local
+  }
+  HTTPSEnable : 1
+  HTTPSPort : 8080
+  HTTPSProxy : global-proxy.example.com
+  __SCOPED__ : <dictionary> {
+    en0 : <dictionary> {
+      ExceptionsList : <array> {
+        0 : scoped.example.com
+      }
+      HTTPSEnable : 0
+      HTTPSProxy : scoped-proxy.example.com
+      ProxyAutoConfigEnable : 1
+      ProxyAutoConfigURLString : https://scoped.example.com/proxy.pac
+    }
+  }
+}
+`;
+    assert.deepEqual(parseScutilProxy(output), {
+      origin: "macOS",
+      httpsProxy: "global-proxy.example.com:8080",
+      bypass: ["*.local"],
+    });
+  });
+
   it("ignores disabled settings and the plain HTTP proxy", () => {
     const output = `<dictionary> {
   HTTPEnable : 1

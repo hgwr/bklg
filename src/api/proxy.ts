@@ -1,7 +1,7 @@
 import { ProxyAgent, type Dispatcher } from "undici";
 
 import { err, isNonEmptyString, ok, type Result } from "../utils/index.js";
-import { evaluatePac, loadPacScript, parsePacResult } from "./pac.js";
+import { evaluatePac, loadPacScript, parsePacResult, type EvaluatePacOptions } from "./pac.js";
 import { readSystemProxySettings, type SystemProxySettings } from "./system-proxy.js";
 
 type Env = Record<string, string | undefined>;
@@ -24,6 +24,7 @@ export type ResolveProxyOptions = {
   platform?: NodeJS.Platform;
   readSystemSettings?: (platform: NodeJS.Platform) => Promise<Result<SystemProxySettings | null>>;
   loadPac?: (pacUrl: string) => Promise<Result<string>>;
+  pacTimeoutMs?: number;
   log?: (message: string) => void;
 };
 
@@ -173,7 +174,11 @@ const resolveFromPac = async (
     return null;
   }
 
-  const pacResult = await evaluatePac(scriptResult.value, target);
+  const pacOptions: EvaluatePacOptions = { onAlert: (message) => log(`PAC alert: ${message}`) };
+  if (options.pacTimeoutMs !== undefined) {
+    pacOptions.timeoutMs = options.pacTimeoutMs;
+  }
+  const pacResult = await evaluatePac(scriptResult.value, target, pacOptions);
   if (!pacResult.ok) {
     log(`could not evaluate PAC file (${source}): ${pacResult.error.message}`);
     return null;
@@ -274,7 +279,9 @@ const createDispatcher = (decision: ProxyDecision): Dispatcher | undefined => {
 
 const transportCache = new Map<string, Promise<Result<ProxyTransport>>>();
 
-// Resolves the proxy once per origin and process.
+// Resolves the proxy once per origin and process. Only the origin is used for routing (the PAC file
+// gets scheme://host:port/ as well), so one decision per origin is exact and the path and apiKey
+// never reach the proxy resolution.
 export const getProxyTransport = (
   target: URL,
   log?: (message: string) => void,
@@ -285,7 +292,8 @@ export const getProxyTransport = (
   }
 
   const options: ResolveProxyOptions = log ? { log } : {};
-  const transport = resolveProxy(target, options).then((result): Result<ProxyTransport> => {
+  const origin = new URL(target.origin);
+  const transport = resolveProxy(origin, options).then((result): Result<ProxyTransport> => {
     if (!result.ok) {
       return result;
     }

@@ -68,7 +68,11 @@ Backlog への通信は常に `https://` なので、プロキシには `CONNECT
 #### PAC
 
 - PAC ファイルはプロキシを通さず直接取得する（`http(s)://` / `file://`、タイムアウト 10 秒）。
-- `FindProxyForURL()` は QuickJS（WebAssembly）のサンドボックスで実行する。
+- `FindProxyForURL()` は QuickJS（WebAssembly）のサンドボックスで、ワーカースレッド上で実行する。
+  - 渡す URL は `https://{space}.{host}/` のみ（ブラウザが https の URL に対して行うのと同様に、パスとクエリ＝`apiKey` を渡さない）。
+  - 評価のタイムアウトは 5 秒。超えたらワーカーを終了し、評価失敗として扱う（無限ループや応答しない DNS 参照でも止まる）。
+  - PAC の `alert()` は標準出力に出さず、`--debug` 時のみ stderr に `PAC alert: ...` として出す。
+- 判定はオリジン（scheme/host/port）単位なので、プロセス内ではオリジンごとに 1 回だけ解決する。
 - 結果の先頭から `PROXY` / `HTTPS` / `DIRECT` のうち最初のものを使う。`SOCKS` などは読み飛ばす。
 - PAC の取得・評価に失敗した場合は、OS の HTTPS プロキシ設定、無ければ直接接続にフォールバックする。
 - OS のバイパスリスト（macOS `ExceptionsList`、Windows `ProxyOverride`）は手動設定のプロキシにのみ適用する（PAC は PAC 自身が判断する）。

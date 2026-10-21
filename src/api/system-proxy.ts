@@ -17,33 +17,48 @@ const WINDOWS_INTERNET_SETTINGS_KEY =
 
 type ScutilValue = string | string[];
 
+// Reads the top-level keys only. Nested dictionaries such as the per-interface `__SCOPED__`
+// settings are skipped so they cannot override the global settings.
 const parseScutilDictionary = (output: string): Record<string, ScutilValue> => {
   const values: Record<string, ScutilValue> = {};
+  // 1 = inside the top-level <dictionary>.
+  let depth = 0;
   let currentArray: string[] | null = null;
 
-  for (const line of output.split(/\r?\n/)) {
-    if (currentArray) {
-      if (/^\s*\}\s*$/.test(line)) {
+  for (const rawLine of output.split(/\r?\n/)) {
+    const line = rawLine.trim();
+    if (!line) {
+      continue;
+    }
+
+    if (line === "}") {
+      depth -= 1;
+      if (depth <= 1) {
         currentArray = null;
-        continue;
       }
-      const entry = /^\s*\d+\s*:\s*(.*)$/.exec(line);
+      continue;
+    }
+
+    const opening = /^(?:(\S+)\s*:\s*)?<(array|dictionary)>\s*\{$/.exec(line);
+    if (opening) {
+      if (depth === 1 && opening[1] && opening[2] === "array") {
+        currentArray = [];
+        values[opening[1]] = currentArray;
+      }
+      depth += 1;
+      continue;
+    }
+
+    if (depth === 1) {
+      const scalar = /^(\S+)\s*:\s*(.*)$/.exec(line);
+      if (scalar?.[1] && scalar[2] !== undefined) {
+        values[scalar[1]] = scalar[2];
+      }
+    } else if (depth === 2 && currentArray) {
+      const entry = /^\d+\s*:\s*(.*)$/.exec(line);
       if (entry?.[1] !== undefined) {
-        currentArray.push(entry[1].trim());
+        currentArray.push(entry[1]);
       }
-      continue;
-    }
-
-    const arrayStart = /^\s*(\S+)\s*:\s*<array>\s*\{\s*$/.exec(line);
-    if (arrayStart?.[1]) {
-      currentArray = [];
-      values[arrayStart[1]] = currentArray;
-      continue;
-    }
-
-    const scalar = /^\s*(\S+)\s*:\s*(.*)$/.exec(line);
-    if (scalar?.[1] && scalar[2] !== undefined) {
-      values[scalar[1]] = scalar[2].trim();
     }
   }
 
